@@ -10,4 +10,5 @@ urlpatterns = [
     path('appointments/', include('appointments.urls')),
     path('review/', include('review.urls')),
     path('newsletter/', include('newsletter.urls')),
+    path('offers/', include('offers.urls')),
 ]
