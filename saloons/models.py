@@ -26,11 +26,17 @@ class Saloon(models.Model):
     facebook_link = models.CharField(max_length=255, null=True)
     instagram_link = models.CharField(max_length=255, null=True)
 
+    def __str__(self):
+        return self.name
+
 
 class Gallery(models.Model):
     id = models.UUIDField( 
         primary_key = True, 
         default = uuid.uuid4, 
         editable = False)
-    restaurant = models.ForeignKey(Saloon, on_delete=models.CASCADE)
+    saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE)
     image = models.ImageField(upload_to="gallery")
+
+    def __str__(self):
+        return f"Image for {self.saloon.name}"

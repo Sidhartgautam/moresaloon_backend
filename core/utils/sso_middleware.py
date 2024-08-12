@@ -3,7 +3,6 @@ from django.conf import settings
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import UntypedToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
-# from restaurants.models import Restaurant
 from django.db.models import Q
 from django.contrib.auth import get_user_model
 
