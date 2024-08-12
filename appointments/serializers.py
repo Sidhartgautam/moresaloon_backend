@@ -1,28 +1,32 @@
+from datetime import datetime, timedelta
 from rest_framework import serializers
 from .models import Appointment
-from staffs.models import Staff
 
 class AppointmentSerializer(serializers.ModelSerializer):
-    total_price = serializers.SerializerMethodField()
+    end_time = serializers.TimeField(read_only=True)
     class Meta:
         model = Appointment
-        fields = ['user', 'saloon', 'service', 'staff', 'date', 'start_time', 'end_time', 'status','total_price', 'payment_status', 'payment_method']
-    def get_total_price(self, obj):
-        return obj.service.price
-    
+        fields = ['user', 'saloon', 'service', 'staff', 'date', 'start_time','end_time', 'status', 'payment_status', 'payment_method']
+
     def validate(self, data):
-        # Ensure the appointment is within staff working hours and doesn't overlap with breaks
         staff = data['staff']
         date = data['date']
         start_time = data['start_time']
-        end_time = data['end_time']
+        service = data['service']
 
+        # Ensure the staff is working on the given day
         working_day = staff.working_days.filter(day_of_week=date.strftime('%A')).first()
-
         if not working_day:
             raise serializers.ValidationError(f"Staff is not working on {date.strftime('%A')}.")
 
-        # Check if the appointment time falls within the working hours
+        # Calculate the end time based on service duration
+        if start_time and service and service.duration:
+            end_time = (datetime.combine(date.today(), start_time) + service.duration).time()
+            data['end_time'] = end_time
+        else:
+            raise serializers.ValidationError("Start time, service, or service duration is missing.")
+
+        # Check if the appointment falls within working hours
         if not (working_day.start_time <= start_time and end_time <= working_day.end_time):
             raise serializers.ValidationError("Appointment time is outside of staff working hours.")
 
@@ -31,7 +35,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             if break_time.break_start < end_time and start_time < break_time.break_end:
                 raise serializers.ValidationError("Appointment time overlaps with staff break time.")
 
-        # Check for overlapping appointments for the same staff
+        # Check for overlapping appointments
         overlapping_appointments = Appointment.objects.filter(
             staff=staff,
             date=date,

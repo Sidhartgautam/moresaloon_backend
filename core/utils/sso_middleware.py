@@ -11,35 +11,26 @@ User = get_user_model()
 class SSOAuthentication(JWTAuthentication):
 
     def authenticate(self, request):
-        header = self.get_header(request)
-        if header is None:
+        auth_header = request.headers.get('Authorization')
+        if auth_header:
+            auth_header = auth_header.replace('Bearer ', '')
+        else:
             return None
 
-        raw_token = self.get_raw_token(header)
-        if raw_token is None:
-            return None
+        validated_token = self.get_validated_token(auth_header)
+        return self.get_or_create_user(auth_header), validated_token
 
-        validated_token = self.get_validated_token(raw_token)
-        return self.get_or_create_user(validated_token), validated_token
-
-    def get_validated_token(self, raw_token):
-        try:
-            token = UntypedToken(raw_token)
-        except TokenError as e:
-            raise InvalidToken(e.args[0])
-
+    def get_validated_token(self, auth_header):
         sso_service_url = f"{settings.SSO_SERVICE_URL}auth/verify/token/"
-        response = requests.post(sso_service_url, data={'token': raw_token})
-        
+        response = requests.post(sso_service_url, data={'token': auth_header})
         if response.status_code != 200:
             raise InvalidToken("Token is invalid")
-
-        return token
+        return True
 
     def get_or_create_user(self, validated_token):
+        print(validated_token)
         user_basic_details = f"{settings.SSO_SERVICE_URL}auth/user/all/details/"
         response = requests.get(user_basic_details, headers={'Authorization': f'Bearer {validated_token}'})
-
         if response.status_code != 200:
             raise InvalidToken("Unable to fetch user details")
 
@@ -50,6 +41,7 @@ class SSOAuthentication(JWTAuthentication):
         first_name = user_data['data']['first_name']
         last_name = user_data['data']['last_name']
         phone_number = user_data['data']['phone_number']
+
 
         try:
             user = User.objects.get(Q(email=user_email) | Q(username=username) | Q(phone_number=phone_number))

@@ -73,11 +73,10 @@ class Appointment(models.Model):
                 raise ValidationError("The appointment time overlaps with a break.")
 
     def save(self, *args, **kwargs):
-        # Calculate end_time based on service duration
-        if self.start_time and self.service:
+        # Calculate end_time based on service duration if not provided
+        if self.start_time and self.service and not self.end_time:
             service_duration = self.service.duration
             start_datetime = datetime.combine(date.today(), self.start_time)
             end_datetime = start_datetime + service_duration
             self.end_time = end_datetime.time()
-        self.clean()
         super().save(*args, **kwargs)
