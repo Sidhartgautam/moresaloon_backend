@@ -28,6 +28,7 @@ PAYMENT_METHOD_CHOICES = [
 
 class Appointment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    appointment_id = models.CharField(max_length=50, null=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE)
@@ -41,7 +42,7 @@ class Appointment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user} - {self.saloon} - {self.service} on {self.date} at {self.start_time}"
+        return f"{self.appointment_id}-{self.user} - {self.saloon} - {self.service} on {self.date} at {self.start_time}"
 
     def clean(self):
          # Ensure the service and staff are from the same saloon as the appointment
@@ -72,7 +73,11 @@ class Appointment(models.Model):
                 raise ValidationError("The appointment time overlaps with a break.")
 
     def save(self, *args, **kwargs):
-        # Calculate end_time based on service_time
-        self.end_time = (datetime.combine(date.today(), self.start_time) + self.service.duration).time()
+        # Calculate end_time based on service duration
+        if self.start_time and self.service:
+            service_duration = self.service.duration
+            start_datetime = datetime.combine(date.today(), self.start_time)
+            end_datetime = start_datetime + service_duration
+            self.end_time = end_datetime.time()
         self.clean()
         super().save(*args, **kwargs)

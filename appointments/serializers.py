@@ -3,10 +3,13 @@ from .models import Appointment
 from staffs.models import Staff
 
 class AppointmentSerializer(serializers.ModelSerializer):
+    total_price = serializers.SerializerMethodField()
     class Meta:
         model = Appointment
-        fields = ['user', 'saloon', 'service', 'staff', 'date', 'start_time', 'end_time', 'status', 'payment_status', 'payment_method']
-
+        fields = ['user', 'saloon', 'service', 'staff', 'date', 'start_time', 'end_time', 'status','total_price', 'payment_status', 'payment_method']
+    def get_total_price(self, obj):
+        return obj.service.price
+    
     def validate(self, data):
         # Ensure the appointment is within staff working hours and doesn't overlap with breaks
         staff = data['staff']

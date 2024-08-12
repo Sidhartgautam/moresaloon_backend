@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from core.utils.response import PrepareResponse
 from core.utils.moredealstoken import get_moredeals_token
+from rest_framework.generics import GenericAPIView
 import stripe
 from django.conf import settings
 from django.core.mail import send_mail
@@ -22,7 +23,7 @@ class PlaceAppointmentAPIView(APIView):
     def post(self, request, *args, **kwargs):
         data = request.data
         serializer = AppointmentSerializer(data=data, context={'request': request})
-        
+
         if serializer.is_valid():
             saloon_id = serializer.validated_data.get('saloon').id
             saloon = get_object_or_404(Saloon, id=saloon_id)
@@ -101,7 +102,7 @@ class UserAppointmentsListAPIView(generics.ListAPIView):
     def get_queryset(self):
         return Appointment.objects.filter(user=self.request.user)
 
-    def list(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         response = PrepareResponse(
@@ -114,12 +115,12 @@ class UserAppointmentsListAPIView(generics.ListAPIView):
 class AppointmentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Appointment.objects.all()
     serializer_class = AppointmentSerializer
-    lookup_field = 'id'
+    lookup_field = 'appointment_id'
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         appointment_id = self.kwargs.get(self.lookup_field)
-        appointment = get_object_or_404(Appointment, id=appointment_id)
+        appointment = get_object_or_404(Appointment, appointment_id=appointment_id)
         serializer = self.get_serializer(appointment)
         response = PrepareResponse(
             success=True,
@@ -128,22 +129,25 @@ class AppointmentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
         )
         return response.send(200)
 
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+    def put(self, request, *args, **kwargs):
+        appointment_id = self.kwargs.get(self.lookup_field)
+        appointment = get_object_or_404(Appointment, appointment_id=appointment_id)
+        serializer = self.get_serializer(appointment, data=request.data)
         serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        return Response({
-            'success': True,
-            'message': 'Appointment updated successfully',
-            'data': serializer.data
-        })
+        serializer.save()
+        response = PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message="Appointment updated successfully"
+        )
+        return response.send(200)
 
     def delete(self, request, *args, **kwargs):
-        appointment = self.get_object()
+        appointment_id = self.kwargs.get(self.lookup_field)
+        appointment = get_object_or_404(Appointment, appointment_id=appointment_id)
         appointment.delete()
-        return Response({
-            'success': True,
-            'message': 'Appointment deleted successfully'
-        }, status=status.HTTP_204_NO_CONTENT)
+        response = PrepareResponse(
+            success=True,
+            message="Appointment deleted successfully"
+        )
+        return response.send(204)
