@@ -17,7 +17,7 @@ url_patterns = [
         name="swagger-ui",
     ),
     path("docs/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
-    path('api/', include('morefood.api_urls')),
+    path('api/', include('core.api_urls')),
 ]
 
 urlpatterns = static(

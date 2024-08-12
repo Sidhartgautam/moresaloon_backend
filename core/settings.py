@@ -26,10 +26,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-58pn7pvl9xa3i5)0%@)89or60py7a0^0h+!*)x6h=pilpr40!5'
 
+#STRIPE_SECRET_KEY
+STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY')
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -49,6 +52,13 @@ INSTALLED_APPS = [
     'users',
     'saloons',
     'country',
+    'appointments',
+    'services',
+    'staffs',
+    'review',
+    'search',
+    'newsletter',
+    'offers',
 ]
 
 MIDDLEWARE = [
@@ -160,11 +170,25 @@ REST_FRAMEWORK = {
     "TEST_REQUEST_DEFAULT_FORMAT":
     "json",
 }
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "MoreTechGlobal User Modules API Document",
+    "DESCRIPTION": "Welcome to MoreTechGlobal Centeral Authentication Service",
+    "VERSION": "1.0.0",
+    "SWAGGER_UI_FAVICON_HREF": None,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": r"/api/",
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],
+}
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=5),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+SSO_SERVICE_URL = 'https://moretrek.com/api/'
+
+CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8000/']
 
 EMAIL_BACKEND = config('EMAIL_BACKEND')
 EMAIL_HOST = config('EMAIL_HOST')

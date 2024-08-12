@@ -2,7 +2,8 @@ from rest_framework import serializers
 from saloons.models import Saloon,Gallery
 
 class SaloonSerializer(serializers.ModelSerializer):
-    logo = serializers.SerializerMethodField()
+    logo = serializers.ImageField(required=True)
+    banner = serializers.ImageField(required=False)
     class Meta:
         model = Saloon
         exclude = ['user']
@@ -13,11 +14,6 @@ class SaloonSerializer(serializers.ModelSerializer):
         return obj.logo.url
     
 class GallerySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Gallery
-        fields = ('image',)
-        
-class UserUploadGallerySerializer(serializers.ModelSerializer):
     class Meta:
         model = Gallery
         fields = ('image',)
