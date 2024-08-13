@@ -2,8 +2,8 @@ import requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import generics, permissions
+from rest_framework.permissions import IsAuthenticated,IsAdminUser
 from django.shortcuts import get_object_or_404
 from core.utils.response import PrepareResponse
 from core.utils.moredealstoken import get_moredeals_token
@@ -11,9 +11,10 @@ from rest_framework.generics import GenericAPIView
 import stripe
 from django.conf import settings
 from django.core.mail import send_mail
-from .models import Appointment
-from .serializers import AppointmentSerializer
+from .models import Appointment, AppointmentSlot
+from .serializers import AppointmentSerializer, AppointmentSlotSerializer
 from saloons.models import Saloon
+from core.utils.pagination import CustomPagination
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -149,5 +150,94 @@ class AppointmentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
         response = PrepareResponse(
             success=True,
             message="Appointment deleted successfully"
+        )
+        return response.send(204)
+    
+class AppointmentSlotListAPIView(generics.ListAPIView):
+    queryset = AppointmentSlot.objects.all()
+    serializer_class = AppointmentSlotSerializer
+    pagination_class = CustomPagination
+    permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        saloon_id = self.request.query_params.get('saloon_id')
+        if saloon_id:
+            queryset = queryset.filter(saloon_id=saloon_id)
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            response = PrepareResponse(
+                success=True,
+                message="Appointment slots fetched successfully",
+                data=serializer.data
+            )
+            return self.get_paginated_response(response.send())
+
+        serializer = self.get_serializer(queryset, many=True)
+        response = PrepareResponse(
+            success=True,
+            message="Appointment slots fetched successfully",
+            data=serializer.data
+        )
+        return response.send()
+
+class AppointmentSlotCreateAPIView(generics.GenericAPIView):
+    queryset = AppointmentSlot.objects.all()
+    serializer_class = AppointmentSlotSerializer
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        
+        response = PrepareResponse(
+            success=True,
+            message="Appointment slot created successfully",
+            data=serializer.data
+        )
+        return response.send(status.HTTP_201_CREATED)
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+class AppointmentSlotDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = AppointmentSlot.objects.all()
+    serializer_class = AppointmentSlotSerializer
+    lookup_field = 'id'
+
+    def get(self, request, *args, **kwargs):
+        appointment_slot = self.get_object()
+        serializer = self.get_serializer(appointment_slot)
+        response = PrepareResponse(
+            success=True,
+            message="Appointment slot details fetched successfully",
+            data=serializer.data
+        )
+        return response.send(200)
+
+    def put(self, request, *args, **kwargs):
+        appointment_slot = self.get_object()
+        serializer = self.get_serializer(appointment_slot, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        response = PrepareResponse(
+            success=True,
+            message="Appointment slot updated successfully",
+            data=serializer.data
+        )
+        return response.send(200)
+
+    def delete(self, request, *args, **kwargs):
+        appointment_slot = self.get_object()
+        appointment_slot.delete()
+        response = PrepareResponse(
+            success=True,
+            message="Appointment slot deleted successfully"
         )
         return response.send(204)

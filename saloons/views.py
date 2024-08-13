@@ -7,10 +7,9 @@ from .serializers import SaloonSerializer, GallerySerializer,PopularSaloonSerial
 from core.utils.pagination import CustomPagination
 from core.utils.response import PrepareResponse
 
-class SaloonCreateView(generics.CreateAPIView):
+class SaloonCreateView(generics.GenericAPIView):
     serializer_class = SaloonSerializer
-    # permission_classes = [IsAuthenticated]
-
+    permission_classes = [IsAuthenticated]
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
@@ -20,7 +19,7 @@ class SaloonCreateView(generics.CreateAPIView):
                 data=serializer.data,
                 message="Saloon created successfully"
             )
-            return response.send(201)
+            return response.send(status.HTTP_201_CREATED)
         response = PrepareResponse(
             success=False,
             data=serializer.errors,
@@ -31,7 +30,7 @@ class SaloonCreateView(generics.CreateAPIView):
 class SaloonListView(generics.GenericAPIView):
     serializer_class = SaloonSerializer
     pagination_class = CustomPagination
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         country_code = request.GET.get('country_code')
@@ -59,27 +58,33 @@ class SaloonListView(generics.GenericAPIView):
         )
         return response.send(200)
 
-class SaloonDetailView(generics.RetrieveAPIView):
+class SaloonDetailView(generics.GenericAPIView):
     queryset = Saloon.objects.all()
     serializer_class = SaloonSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_object(self):
+        pk = self.kwargs.get('pk')
+        return self.queryset.get(pk=pk)
+
     def get(self, request, *args, **kwargs):
-        saloon = self.get_object()
-        serializer = self.get_serializer(saloon)
+        saloon = self.get_object()  
+        serializer = self.get_serializer(saloon) 
         response = PrepareResponse(
             success=True,
             data=serializer.data,
             message="Saloon details fetched successfully"
         )
-        return response.send(200)
+        return response.send(status.HTTP_200_OK)
 
-class GalleryUploadView(generics.CreateAPIView):
+class GalleryUploadView(generics.GenericAPIView):
     serializer_class = GallerySerializer
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, files=request.FILES)
+        data = request.data.copy()
+        data.update(request.FILES)
+        serializer = self.get_serializer(data=data)
         if serializer.is_valid():
             serializer.save()
             response = PrepareResponse(
@@ -87,7 +92,7 @@ class GalleryUploadView(generics.CreateAPIView):
                 data=serializer.data,
                 message="Image uploaded successfully"
             )
-            return response.send(201)
+            return response.send(status.HTTP_201_CREATED)
         response = PrepareResponse(
             success=False,
             data=serializer.errors,
@@ -138,32 +143,31 @@ class NearestSaloonView(APIView):
         return response.send(200)
 
 
-class PopularSaloonListView(generics.ListAPIView):
+class PopularSaloonListView(generics.GenericAPIView):
     serializer_class = PopularSaloonSerializer
     pagination_class = CustomPagination
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Assuming review_count is calculated elsewhere, e.g., using annotations
         return Saloon.objects.filter(review_count__gt=0).order_by('-review_count')
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        page = self.paginate_queryset(queryset)
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             response = PrepareResponse(
                 success=True,
                 data=serializer.data,
                 message="Popular saloons fetched successfully",
-                meta=self.get_paginated_response(serializer.data).data['meta']
+                meta=paginator.get_paginated_response(serializer.data).data['meta']
             )
-            return response.send(200)
-
+            return response.send(status.HTTP_200_OK)
         serializer = self.get_serializer(queryset, many=True)
         response = PrepareResponse(
             success=True,
             data=serializer.data,
             message="Popular saloons fetched successfully"
         )
-        return response.send(200)
+        return response.send(status.HTTP_200_OK)

@@ -16,7 +16,7 @@ class SaloonSerializer(serializers.ModelSerializer):
 class GallerySerializer(serializers.ModelSerializer):
     class Meta:
         model = Gallery
-        fields = ('image',)
+        fields = ('image','saloon')
 
 class PopularSaloonSerializer(serializers.ModelSerializer):
     review_count = serializers.IntegerField(read_only=True)

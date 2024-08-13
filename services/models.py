@@ -41,5 +41,5 @@ class ServiceImage(models.Model):
     image = models.ImageField(upload_to='services/images')
 
     def __str__(self):
-        return f"Image for {self.service.name}"
+        return f"Image for {self.service.name}-{self.service.saloon.name}"
         

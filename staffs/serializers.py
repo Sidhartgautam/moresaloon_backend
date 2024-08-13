@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Staff, WorkingDay, BreakTime
+from saloons.models import Saloon
 
 class BreakTimeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,7 +16,8 @@ class WorkingDaySerializer(serializers.ModelSerializer):
 
 class StaffSerializer(serializers.ModelSerializer):
     working_days = WorkingDaySerializer(many=True, required=False)
+    saloon = serializers.PrimaryKeyRelatedField(queryset=Saloon.objects.all())
 
     class Meta:
         model = Staff
-        fields = ['id', 'name','saloon', 'position', 'working_days']
+        fields = ['id','saloon', 'name', 'position', 'working_days']
