@@ -9,7 +9,7 @@ class Staff(models.Model):
     position = models.CharField(max_length=255)
 
     def __str__(self):
-        return f"{self.name} - {self.saloon.name}"
+        return f"{self.name} - {self.saloon.name if self.saloon else 'No Saloon'}"
 
 class WorkingDay(models.Model):
     staff = models.ForeignKey(Staff, related_name='working_days', on_delete=models.CASCADE)
@@ -34,4 +34,4 @@ class BreakTime(models.Model):
     break_end = models.TimeField()
 
     def __str__(self):
-        return f"{self.working_day.staff.name} - {self.break_start} to {self.break_end}"
+        return f" {self.working_day.staff.name} - {self.break_start} to {self.break_end}"

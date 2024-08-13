@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Appointment
+from .models import Appointment, AppointmentSlot
 from datetime import datetime
 
 class AppointmentAdmin(admin.ModelAdmin):
@@ -14,3 +14,9 @@ class AppointmentAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 admin.site.register(Appointment, AppointmentAdmin)
+
+@admin.register(AppointmentSlot)
+class AppointmentSlotAdmin(admin.ModelAdmin):
+    list_display = ['saloon', 'staff', 'service', 'date', 'start_time', 'end_time', 'is_available']
+    list_filter = ['saloon', 'staff', 'service', 'date']
+    search_fields = ['saloon__name', 'staff__name', 'service__name', 'date']

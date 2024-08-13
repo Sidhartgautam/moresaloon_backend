@@ -1,12 +1,20 @@
 from datetime import datetime, timedelta
 from rest_framework import serializers
-from .models import Appointment
+from .models import Appointment, AppointmentSlot
+
+
+class AppointmentSlotSerializer(serializers.ModelSerializer):
+    end_time = serializers.TimeField(read_only=True)
+    class Meta:
+        model = AppointmentSlot
+        fields = ['id', 'saloon', 'staff', 'date', 'start_time', 'end_time', 'is_available']
 
 class AppointmentSerializer(serializers.ModelSerializer):
     end_time = serializers.TimeField(read_only=True)
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     class Meta:
         model = Appointment
-        fields = ['user', 'saloon', 'service', 'staff', 'date', 'start_time','end_time', 'status', 'payment_status', 'payment_method']
+        fields = ['user', 'saloon', 'service', 'staff', 'date', 'start_time','end_time', 'status', 'payment_status', 'payment_method', 'total_price']
 
     def validate(self, data):
         staff = data['staff']
