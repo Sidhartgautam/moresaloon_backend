@@ -6,32 +6,36 @@ from .serializers import StaffSerializer
 from core.utils.response import PrepareResponse
 from datetime import datetime, timedelta
 from appointments.models import Appointment
-from core.utils.pagination import CustomPagination
+from core.utils.pagination import CustomPageNumberPagination
 
 class StaffListView(generics.GenericAPIView):
     queryset = Staff.objects.all()
     serializer_class = StaffSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = CustomPagination
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self):
+        saloon_id = self.kwargs.get('saloon_id')
+        queryset = Staff.objects.all()
+
+        if saloon_id:
+            queryset = queryset.filter(saloon_id=saloon_id)
+
+        return queryset
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            response = PrepareResponse(
-                success=True,
-                data=serializer.data,
-                message="Staff list fetched successfully",
-                meta=self.get_paginated_response(serializer.data).data['meta']
-            )
-            return response.send(200)
-
-        serializer = self.get_serializer(queryset, many=True)
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = self.get_serializer(page, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+        result = paginated_data['results']
+        del paginated_data['results']
         response = PrepareResponse(
             success=True,
-            data=serializer.data,
-            message="Staff list fetched successfully"
+            data=result,
+            message="Staff list fetched successfully",
+            meta=paginated_data
         )
         return response.send(200)
     

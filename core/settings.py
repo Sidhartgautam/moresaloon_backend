@@ -169,6 +169,8 @@ REST_FRAMEWORK = {
     "%Y-%m-%dT%H:%M:%S",
     "TEST_REQUEST_DEFAULT_FORMAT":
     "json",
+    "DEFAULT_PAGINATION_CLASS":
+    "rest_framework.pagination.LimitOffsetPagination",
 }
 
 SPECTACULAR_SETTINGS = {

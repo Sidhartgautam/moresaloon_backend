@@ -18,8 +18,6 @@ class ServiceSerializer(serializers.ModelSerializer):
     images = ServiceImageSerializer(many=True, read_only=True)
     category =serializers.PrimaryKeyRelatedField(queryset=ServiceCategory.objects.all())
     description = serializers.CharField()
-    
-    
     class Meta:
         model = Service
         fields = ['id', 'category', 'name', 'description', 'duration', 'price', 'images']

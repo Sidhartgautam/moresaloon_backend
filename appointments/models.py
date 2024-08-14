@@ -5,7 +5,7 @@ from users.models import User
 from staffs.models import Staff
 import uuid
 from django.core.exceptions import ValidationError
-from datetime import timedelta, datetime, date
+from datetime import datetime
 
 APPOINTMENT_STATUS_CHOICES = [
     ('Pending', 'Pending'),
