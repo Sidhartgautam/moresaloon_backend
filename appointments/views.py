@@ -1,20 +1,17 @@
 import requests
 from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
 from rest_framework import generics, permissions
 from rest_framework.permissions import IsAuthenticated,IsAdminUser
 from django.shortcuts import get_object_or_404
 from core.utils.response import PrepareResponse
 from core.utils.moredealstoken import get_moredeals_token
-from rest_framework.generics import GenericAPIView
 import stripe
 from django.conf import settings
 from django.core.mail import send_mail
 from .models import Appointment, AppointmentSlot
 from .serializers import AppointmentSerializer, AppointmentSlotSerializer
 from saloons.models import Saloon
-from core.utils.pagination import CustomPagination
+from core.utils.pagination import CustomPageNumberPagination
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -64,14 +61,14 @@ class PlaceAppointmentAPIView(APIView):
                             message=errors,
                             errors={"non_field_errors": [errors]}
                         )
-                        return response_json.send(status.HTTP_400_BAD_REQUEST)
+                        return response_json.send(400)
                 else:
                     response_json = PrepareResponse(
                         success=False,
                         message="PIN not provided for MoreDeals payment",
                         errors={"non_field_errors": ["PIN not provided for MoreDeals payment"]}
                     )
-                    return response_json.send(status.HTTP_400_BAD_REQUEST)
+                    return response_json.send(400)
 
             if appointment:
                 send_mail(
@@ -85,7 +82,7 @@ class PlaceAppointmentAPIView(APIView):
                     message="Appointment placed successfully",
                     data=serializer.data
                 )
-                return response.send(status.HTTP_200_OK)
+                return response.send(200)
             else:
                 raise ValueError("Appointment processing failed")
         else:
@@ -94,7 +91,7 @@ class PlaceAppointmentAPIView(APIView):
                 data=serializer.errors,
                 message="Appointment failed"
             )
-            return response.send(status.HTTP_400_BAD_REQUEST)
+            return response.send(400)
 
 class UserAppointmentsListAPIView(generics.ListAPIView):
     serializer_class = AppointmentSerializer
@@ -153,38 +150,33 @@ class AppointmentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
         )
         return response.send(204)
     
-class AppointmentSlotListAPIView(generics.ListAPIView):
-    queryset = AppointmentSlot.objects.all()
+class AppointmentSlotListAPIView(generics.GenericAPIView):
     serializer_class = AppointmentSlotSerializer
-    pagination_class = CustomPagination
+    pagination_class = CustomPageNumberPagination
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = AppointmentSlot.objects.all()
         saloon_id = self.request.query_params.get('saloon_id')
         if saloon_id:
             queryset = queryset.filter(saloon_id=saloon_id)
         return queryset
 
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            response = PrepareResponse(
-                success=True,
-                message="Appointment slots fetched successfully",
-                data=serializer.data
-            )
-            return self.get_paginated_response(response.send())
-
-        serializer = self.get_serializer(queryset, many=True)
+    def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = self.get_serializer(page, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+        result = paginated_data['results']
+        del paginated_data['results']
         response = PrepareResponse(
             success=True,
             message="Appointment slots fetched successfully",
-            data=serializer.data
+            data=result,
+            meta=paginated_data
         )
-        return response.send()
+        return response.send(code=200)
 
 class AppointmentSlotCreateAPIView(generics.GenericAPIView):
     queryset = AppointmentSlot.objects.all()
@@ -201,7 +193,7 @@ class AppointmentSlotCreateAPIView(generics.GenericAPIView):
             message="Appointment slot created successfully",
             data=serializer.data
         )
-        return response.send(status.HTTP_201_CREATED)
+        return response.send(201)
 
     def perform_create(self, serializer):
         serializer.save()

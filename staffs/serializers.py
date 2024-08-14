@@ -21,3 +21,9 @@ class StaffSerializer(serializers.ModelSerializer):
     class Meta:
         model = Staff
         fields = ['id','saloon', 'name', 'position', 'working_days']
+
+class StaffAvailabilitySerializer(serializers.Serializer):
+    staff_id = serializers.UUIDField(required=True)
+    appointment_date = serializers.DateField(required=True)
+    start_time = serializers.TimeField(required=True)
+    end_time = serializers.TimeField(required=True)

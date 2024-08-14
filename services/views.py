@@ -1,39 +1,36 @@
 from rest_framework import generics
 from saloons.models import Saloon
 from rest_framework.permissions import IsAuthenticated
-from .models import ServiceCategory, Service, ServiceImage
-from .serializers import ServiceCategorySerializer, ServiceSerializer, ServiceCreateUpdateSerializer, ServiceImageSerializer
-from core.utils.pagination import CustomPagination
-from core.utils.response import PrepareResponse, exception_response
+from .models import ServiceCategory, Service
+from .serializers import ServiceCategorySerializer, ServiceSerializer, ServiceImageSerializer
+from core.utils.pagination import CustomPageNumberPagination
+from core.utils.response import PrepareResponse
 
 class ServiceCategoryListView(generics.GenericAPIView):
     serializer_class = ServiceCategorySerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = CustomPagination
+    pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
         return ServiceCategory.objects.all()
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            response = PrepareResponse(
-                success=True,
-                data=serializer.data,
-                message="Service categories fetched successfully",
-                meta=self.get_paginated_response(serializer.data).data['meta']
-            )
-            return response.send(200)
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = self.get_serializer(page, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+        result = paginated_data['results']
+        del paginated_data['results']
 
-        serializer = self.get_serializer(queryset, many=True)
+        # Prepare the response
         response = PrepareResponse(
             success=True,
-            data=serializer.data,
-            message="Service categories fetched successfully"
+            message="Service categories fetched successfully",
+            data=result,
+            meta=paginated_data
         )
-        return response.send(200)
+        return response.send(code=200)
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
@@ -54,37 +51,31 @@ class ServiceCategoryListView(generics.GenericAPIView):
 class ServiceListView(generics.GenericAPIView):
     serializer_class = ServiceSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = CustomPagination
+    pagination_class = CustomPageNumberPagination 
 
     def get_queryset(self):
         saloon_id = self.kwargs.get('saloon_id')
         queryset = Service.objects.all()
-
         if saloon_id:
             queryset = queryset.filter(saloon_id=saloon_id)
-
         return queryset
-
     def get(self, request, *args, **kwargs):
+        saloon_id = self.kwargs.get('saloon_id')
         queryset = self.get_queryset()
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            response = PrepareResponse(
-                success=True,
-                data=serializer.data,
-                message="Services fetched successfully",
-                meta=self.get_paginated_response(serializer.data).data['meta']
-            )
-            return response.send(200)
-
+        paginator = self.pagination_class()
+        queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.get_serializer(queryset, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+        result = paginated_data['results']
+        del paginated_data['results']
+
         response = PrepareResponse(
             success=True,
-            data=serializer.data,
-            message="Services fetched successfully"
+            data=result,
+            message="Services fetched successfully",
+            meta=paginated_data
         )
-        return response.send(200)
+        return response.send(code=200)
 
     def post(self, request, *args, **kwargs):
         saloon_id = self.kwargs.get('saloon_id')

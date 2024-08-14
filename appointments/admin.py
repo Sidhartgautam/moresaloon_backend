@@ -2,6 +2,9 @@ from django.contrib import admin
 from .models import Appointment, AppointmentSlot
 from datetime import datetime
 
+from django.contrib import admin
+from datetime import datetime
+
 class AppointmentAdmin(admin.ModelAdmin):
     exclude = ('end_time',)  # Exclude end_time from admin form
 
@@ -10,10 +13,15 @@ class AppointmentAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         if obj.start_time and obj.service and obj.service.duration:
-            obj.end_time = (datetime.combine(datetime.today(), obj.start_time) + obj.service.duration).time()
+            service_duration = obj.service.duration
+            start_datetime = datetime.combine(obj.date, obj.start_time)
+            end_datetime = start_datetime + service_duration
+            obj.end_time = end_datetime.time()
+
         super().save_model(request, obj, form, change)
 
 admin.site.register(Appointment, AppointmentAdmin)
+
 
 @admin.register(AppointmentSlot)
 class AppointmentSlotAdmin(admin.ModelAdmin):

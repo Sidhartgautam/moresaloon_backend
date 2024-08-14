@@ -5,7 +5,7 @@ from users.models import User
 from staffs.models import Staff
 import uuid
 from django.core.exceptions import ValidationError
-from datetime import timedelta, datetime, date
+from datetime import datetime
 
 APPOINTMENT_STATUS_CHOICES = [
     ('Pending', 'Pending'),
@@ -69,44 +69,48 @@ class Appointment(models.Model):
         return f"{self.appointment_id}-{self.user} - {self.saloon} - {self.service} on {self.date} at {self.start_time}"
 
     def clean(self):
-         # Ensure the service and staff are from the same saloon as the appointment
+        # Ensure the service and staff are from the same saloon as the appointment
         if self.service.saloon != self.saloon:
             raise ValidationError("The service must be from the same saloon as the appointment.")
         if self.staff.saloon != self.saloon:
             raise ValidationError("The staff must be from the same saloon as the appointment.")
         
         # Validate that the appointment doesn't overlap with another appointment for the same staff
-        overlapping_appointments = Appointment.objects.filter(
-            staff=self.staff,
-            date=self.date,
-            start_time__lt=self.end_time,
-            end_time__gt=self.start_time,
-        ).exists()
+        if self.start_time and self.end_time:  # Ensure both start_time and end_time are not None
+            overlapping_appointments = Appointment.objects.filter(
+                staff=self.staff,
+                date=self.date,
+                start_time__lt=self.end_time,
+                end_time__gt=self.start_time,
+            ).exists()
 
-        if overlapping_appointments:
-            raise ValidationError("This staff is already booked for the selected time slot.")
+            if overlapping_appointments:
+                raise ValidationError("This staff is already booked for the selected time slot.")
 
         # Validate that the appointment falls within the staff's working hours
         working_day = self.staff.working_days.filter(day_of_week=self.date.strftime('%A')).first()
-        if not working_day or not (working_day.start_time <= self.start_time < working_day.end_time):
-            raise ValidationError("The selected time is outside of the staff's working hours.")
+        if working_day and self.start_time and self.end_time:
+            if not (working_day.start_time <= self.start_time < working_day.end_time):
+                raise ValidationError("The selected time is outside of the staff's working hours.")
 
-        # Validate that the appointment doesn't overlap with a break
-        for break_time in working_day.break_times.all():
-            if break_time.break_start < self.end_time and break_time.break_end > self.start_time:
-                raise ValidationError("The appointment time overlaps with a break.")
+            # Validate that the appointment doesn't overlap with a break
+            for break_time in working_day.break_times.all():
+                if break_time.break_start and break_time.break_end:  # Ensure break_start and break_end are not None
+                    if break_time.break_start < self.end_time and break_time.break_end > self.start_time:
+                        raise ValidationError("The appointment time overlaps with a break.")
 
     def save(self, *args, **kwargs):
         # Calculate end_time based on service duration if not provided
         if self.start_time and self.service and not self.end_time:
             service_duration = self.service.duration
-            start_datetime = datetime.combine(date.today(), self.start_time)
+            start_datetime = datetime.combine(self.date, self.start_time)
             end_datetime = start_datetime + service_duration
             self.end_time = end_datetime.time()
 
-            # Calculate total price based on service price
+        # Calculate total price based on service price
         if self.service:
             self.total_price = self.service.price
+
         super().save(*args, **kwargs)
 
 
