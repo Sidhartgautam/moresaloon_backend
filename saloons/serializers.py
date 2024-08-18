@@ -15,9 +15,12 @@ class SaloonSerializer(serializers.ModelSerializer):
         return obj.logo.url if obj.logo else None 
     
 class GallerySerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
     class Meta:
         model = Gallery
-        fields = ('image','saloon')
+        fields = ('image',)
+    def get_image(self, obj):
+        return obj.image.url
 
 class PopularSaloonSerializer(serializers.ModelSerializer):
     review_count = serializers.IntegerField(read_only=True)

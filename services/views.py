@@ -1,7 +1,7 @@
 from rest_framework import generics
 from saloons.models import Saloon
 from rest_framework.permissions import IsAuthenticated
-from .models import ServiceCategory, Service,ServiceVariation
+from .models import ServiceCategory, Service,ServiceVariation,ServiceImage
 from .serializers import ServiceCategorySerializer, ServiceSerializer, ServiceImageSerializer, ServiceVariationSerializer, NestedServiceCategorySerializer
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.response import PrepareResponse
@@ -105,10 +105,15 @@ class ServiceListView(generics.GenericAPIView):
         )
         return response.send(400)
 
-class ServiceDetailView(generics.RetrieveUpdateDestroyAPIView):
+class ServiceDetailView(generics.GenericAPIView):
     queryset = Service.objects.all()
     serializer_class = ServiceSerializer
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        saloon_id = self.kwargs.get('saloon_id')
+        service_id = self.kwargs.get('pk')
+        return self.queryset.get(id=service_id, saloon_id=saloon_id)
 
     def get(self, request, *args, **kwargs):
         service = self.get_object()
@@ -211,8 +216,8 @@ class NestedServiceCategoryListView(generics.GenericAPIView):
     def get_queryset(self):
         saloon_id = self.kwargs.get('saloon_id')
         if saloon_id:
-            queryset = ServiceCategory.objects.filter(saloon_id=saloon_id)
-        return ServiceCategory.objects.all()
+            nestedservicecategory = ServiceCategory.objects.filter(saloon_id=saloon_id)
+        return nestedservicecategory
     def get(self, request, *args, **kwargs):
         saloon_id = self.kwargs.get('saloon_id')
         queryset = self.get_queryset()

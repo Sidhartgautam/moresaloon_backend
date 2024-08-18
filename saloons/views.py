@@ -2,7 +2,7 @@ from math import radians, cos, sin, asin, sqrt
 from rest_framework.views import APIView
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
-from .models import Saloon
+from .models import Saloon,Gallery
 from .serializers import SaloonSerializer, GallerySerializer,PopularSaloonSerializer,SaloonDetailSerializer
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.response import PrepareResponse
@@ -80,7 +80,7 @@ class SaloonDetailView(generics.GenericAPIView):
 
 class GalleryUploadView(generics.GenericAPIView):
     serializer_class = GallerySerializer
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         data = request.data.copy()
@@ -100,6 +100,22 @@ class GalleryUploadView(generics.GenericAPIView):
             message="Image upload failed"
         )
         return response.send(400)
+    
+class GalleryListView(generics.GenericAPIView):
+    serializer_class = GallerySerializer
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        saloon_id = self.kwargs.get('saloon_id')
+        queryset = Gallery.objects.filter(saloon_id=saloon_id)
+        serializer = self.get_serializer(queryset, many=True)
+        response = PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message="Images fetched successfully"
+        )
+        return response.send(200)
+    
     
 class NearestSaloonView(APIView):
     def get(self, request, *args, **kwargs):

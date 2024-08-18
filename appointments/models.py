@@ -69,6 +69,11 @@ class AppointmentSlot(models.Model):
                 service_duration = self.service.base_duration
             end_datetime = start_datetime + service_duration
             self.end_time = end_datetime.time()
+        
+        if self.service_variation:
+            self.total_price = self.service_variation.total_price
+        else:
+            self.total_price = self.service.price
         self.clean()
         super().save(*args, **kwargs)
     
