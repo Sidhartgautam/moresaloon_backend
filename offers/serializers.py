@@ -14,3 +14,22 @@ class SaloonOfferSerializer(serializers.ModelSerializer):
 
     def get_currency_symbol(self, obj):
         return obj.saloon.currency.symbol
+    
+    def validate(self, data):
+        if data['end_offer'] <= data['start_offer']:
+            raise serializers.ValidationError("End offer date must be after the start offer date.")
+        
+        saloon = data['saloon']
+        services = data['service']
+        for service in services:
+            if service.saloon != saloon:
+                raise serializers.ValidationError({
+                    'service': f"The service '{service.name}' does not belong to the selected saloon '{saloon.name}'."
+                })
+        return data
+    
+    def create(self, validated_data):
+        services = validated_data.pop('service')
+        saloon_offer = SaloonOffer.objects.create(**validated_data)
+        saloon_offer.service.set(services)
+        return saloon_offer

@@ -156,7 +156,7 @@ class AppointmentSlotListAPIView(generics.GenericAPIView):
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        queryset = AppointmentSlot.objects.all()
+        queryset = AppointmentSlot.objects.filter(is_available=True)
         saloon_id = self.request.query_params.get('saloon_id')
         if saloon_id:
             queryset = queryset.filter(saloon_id=saloon_id)

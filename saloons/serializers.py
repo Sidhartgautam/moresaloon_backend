@@ -1,17 +1,18 @@
 from rest_framework import serializers
 from saloons.models import Saloon,Gallery
+from review.serializers import ReviewSerializer
 
 class SaloonSerializer(serializers.ModelSerializer):
-    logo = serializers.ImageField(required=True)
-    banner = serializers.ImageField(required=False)
+    logo = serializers.ImageField(required=False)
+    # banner = serializers.ImageField(required=True)
     class Meta:
         model = Saloon
-        exclude = ['user']
+        fields = ['id','name','logo','address','banner']
 
         depth = 1
 
     def get_logo(self, obj):
-        return obj.logo.url
+        return obj.logo.url if obj.logo else None 
     
 class GallerySerializer(serializers.ModelSerializer):
     class Meta:
@@ -23,3 +24,18 @@ class PopularSaloonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Saloon
         fields = ('id', 'name', 'logo','short_description','address','review_count')
+
+class SaloonDetailSerializer(serializers.ModelSerializer):
+    logo = serializers.ImageField(required=False)
+    # banner = serializers.ImageField(required=False)
+    reviews = ReviewSerializer(many=True, read_only=True)
+    class Meta:
+        model = Saloon
+        fields = ['id','name','logo','short_description','long_description','address','banner','email','contact_no','website_link','facebook_link','instagram_link','reviews']
+
+        depth = 1
+
+    def get_logo(self, obj):
+        return obj.logo.url if obj.logo else None 
+ 
+        

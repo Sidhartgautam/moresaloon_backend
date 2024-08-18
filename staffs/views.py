@@ -79,7 +79,7 @@ class StaffAvailabilityView(generics.GenericAPIView):
                     raise Staff.DoesNotExist
             except Staff.DoesNotExist:
                 response = PrepareResponse(success=False, message='Staff not found in the specified saloon.')
-                return response.send(status.HTTP_404_NOT_FOUND)
+                return response.send(404)
 
             working_day = WorkingDay.objects.filter(
                 staff=staff,
@@ -88,17 +88,17 @@ class StaffAvailabilityView(generics.GenericAPIView):
 
             if not working_day:
                 response = PrepareResponse(success=False, message='Staff is not available on this day.')
-                return response.send(status.HTTP_400_BAD_REQUEST)
+                return response.send(400)
 
             if not (working_day.start_time <= appointment_start_time <= working_day.end_time) or not (working_day.start_time <= appointment_end_time <= working_day.end_time):
                 response = PrepareResponse(success=False, message='Appointment time is outside of working hours.')
-                return response.send(status.HTTP_400_BAD_REQUEST)
+                return response.send(400)
 
             break_times = working_day.break_times.all()
             for break_time in break_times:
                 if (break_time.break_start <= appointment_start_time < break_time.break_end) or (break_time.break_start < appointment_end_time <= break_time.break_end):
                     response = PrepareResponse(success=False, message='Appointment overlaps with break time.')
-                    return response.send(status.HTTP_400_BAD_REQUEST)
+                    return response.send(400)
 
             overlapping_appointments = Appointment.objects.filter(
                 staff=staff,
@@ -107,11 +107,11 @@ class StaffAvailabilityView(generics.GenericAPIView):
 
             if overlapping_appointments.exists():
                 response = PrepareResponse(success=False, message='Appointment time overlaps with another booking.')
-                return response.send(status.HTTP_400_BAD_REQUEST)
+                return response.send(400)
 
             response = PrepareResponse(success=True, message='Staff is available.')
         else:
             response = PrepareResponse(success=False, message='Invalid request data.', errors=serializer.errors)
-            return response.send(status.HTTP_400_BAD_REQUEST)
+            return response.send(400)
         
-        return response.send(status.HTTP_200_OK)
+        return response.send(200)
