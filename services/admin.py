@@ -1,7 +1,19 @@
 from django.contrib import admin
-from services.models import ServiceCategory, Service, ServiceImage
+from .models import ServiceCategory, Service, ServiceVariation, ServiceImage
 
-# Register your models here.
-admin.site.register(ServiceCategory)
-admin.site.register(Service)
-admin.site.register(ServiceImage)
+@admin.register(ServiceCategory)
+class ServiceCategoryAdmin(admin.ModelAdmin):
+    list_display = ['name']
+
+@admin.register(Service)
+class ServiceAdmin(admin.ModelAdmin):
+    list_display = ['name', 'category', 'base_duration']
+
+@admin.register(ServiceVariation)
+class ServiceVariationAdmin(admin.ModelAdmin):
+    list_display = ['service', 'name', 'additional_duration', 'total_duration']
+
+
+@admin.register(ServiceImage)
+class ServiceImageAdmin(admin.ModelAdmin):
+    list_display = ['service', 'image']

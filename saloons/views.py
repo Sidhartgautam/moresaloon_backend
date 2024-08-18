@@ -2,8 +2,8 @@ from math import radians, cos, sin, asin, sqrt
 from rest_framework.views import APIView
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
-from .models import Saloon
-from .serializers import SaloonSerializer, GallerySerializer,PopularSaloonSerializer
+from .models import Saloon,Gallery
+from .serializers import SaloonSerializer, GallerySerializer,PopularSaloonSerializer,SaloonDetailSerializer
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.response import PrepareResponse
 from django.db.models import Count
@@ -31,7 +31,7 @@ class SaloonCreateView(generics.GenericAPIView):
 class SaloonListView(generics.GenericAPIView):
     serializer_class = SaloonSerializer
     pagination_class = CustomPageNumberPagination
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         country_code = request.GET.get('country_code')
@@ -61,12 +61,12 @@ class SaloonListView(generics.GenericAPIView):
 
 class SaloonDetailView(generics.GenericAPIView):
     queryset = Saloon.objects.all()
-    serializer_class = SaloonSerializer
-    permission_classes = [IsAuthenticated]
+    serializer_class = SaloonDetailSerializer
+    # permission_classes = [IsAuthenticated]
 
     def get_object(self):
-        pk = self.kwargs.get('pk')
-        return self.queryset.get(pk=pk)
+        saloon_id = self.kwargs.get('saloon_id')
+        return self.queryset.get(id=saloon_id)
 
     def get(self, request, *args, **kwargs):
         saloon = self.get_object()  
@@ -80,7 +80,7 @@ class SaloonDetailView(generics.GenericAPIView):
 
 class GalleryUploadView(generics.GenericAPIView):
     serializer_class = GallerySerializer
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         data = request.data.copy()
@@ -100,6 +100,22 @@ class GalleryUploadView(generics.GenericAPIView):
             message="Image upload failed"
         )
         return response.send(400)
+    
+class GalleryListView(generics.GenericAPIView):
+    serializer_class = GallerySerializer
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        saloon_id = self.kwargs.get('saloon_id')
+        queryset = Gallery.objects.filter(saloon_id=saloon_id)
+        serializer = self.get_serializer(queryset, many=True)
+        response = PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message="Images fetched successfully"
+        )
+        return response.send(200)
+    
     
 class NearestSaloonView(APIView):
     def get(self, request, *args, **kwargs):

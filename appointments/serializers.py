@@ -8,6 +8,25 @@ class AppointmentSlotSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppointmentSlot
         fields = ['id', 'saloon', 'staff', 'date', 'start_time', 'end_time', 'is_available']
+        
+    def validate(self, data):
+        # Check for overlapping slots here
+        staff = data.get('staff')
+        date = data.get('date')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+
+        overlapping_slots = AppointmentSlot.objects.filter(
+            staff=staff,
+            date=date,
+            start_time__lt=end_time,
+            end_time__gt=start_time
+        ).exists()
+
+        if overlapping_slots:
+            raise serializers.ValidationError("The selected time slot overlaps with an existing appointment slot.")
+        
+        return data
 
 class AppointmentSerializer(serializers.ModelSerializer):
     end_time = serializers.TimeField(read_only=True)
