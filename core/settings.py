@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'search',
     'newsletter',
     'offers',
+    'openinghours',
 ]
 
 MIDDLEWARE = [
