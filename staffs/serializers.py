@@ -32,3 +32,14 @@ class StaffAvailabilitySerializer(serializers.Serializer):
     appointment_date = serializers.DateField(required=True)
     start_time = serializers.TimeField(required=True)
     end_time = serializers.TimeField(required=True)
+
+class StaffListSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Staff
+        fields = ['id', 'name', 'image']
+
+    def get_image(self, obj):
+        image = obj.image.url if obj.image else None
+        return image

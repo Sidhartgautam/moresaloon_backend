@@ -1,10 +1,12 @@
 from rest_framework import generics, status
 from .models import Staff, WorkingDay
 from rest_framework.permissions import IsAuthenticated
-from .serializers import StaffSerializer, StaffAvailabilitySerializer
+from .serializers import StaffSerializer, StaffAvailabilitySerializer, StaffListSerializer
 from core.utils.response import PrepareResponse
 from appointments.models import Appointment
 from core.utils.pagination import CustomPageNumberPagination
+
+from django.db.models import Q
 
 class StaffListView(generics.GenericAPIView):
     queryset = Staff.objects.all()
@@ -117,4 +119,50 @@ class StaffAvailabilityView(generics.GenericAPIView):
             return response.send(400)
         
         return response.send(200)
+    
+class StaffListOnlyView(generics.GenericAPIView):
+    serializer_class = StaffListSerializer
 
+    def get_queryset(self):
+        staff_id = self.kwargs.get('staff_id')
+        queryset = Staff.objects.filter(id=staff_id)
+        return queryset
+    def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        if not queryset.exists():
+            response = PrepareResponse(
+                success=False,
+                message="Staff not found",
+                data=None
+            )
+            return response.send(404)
+        staff = queryset.first()
+        serializer = self.get_serializer(staff)
+        response = PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message="Staff details fetched successfully"
+        )
+        return response.send(200)
+
+class StaffForServiceAPIView(generics.GenericAPIView):
+    serializer_class = StaffListSerializer
+
+    def get_queryset(self):
+        service_id = self.request.query_params.get('service_id')  # Get the service ID from query parameters
+        queryset = Staff.objects.all()
+
+        if service_id:
+            queryset = queryset.filter(services__id=service_id)  # Filter staff by the service
+
+        return queryset
+
+    def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        response = PrepareResponse(
+            success=True,
+            message="Staff members for the selected service fetched successfully",
+            data=serializer.data
+        )
+        return response.send(200)

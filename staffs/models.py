@@ -1,5 +1,6 @@
 from django.db import models
 from saloons.models import Saloon
+from services.models import Service
 # import uuid
 # from django.contrib.auth.models import User
 
@@ -8,7 +9,7 @@ class Staff(models.Model):
     # user = models.ForeignKey('users.User', on_delete=models.CASCADE)
     saloon = models.ForeignKey(Saloon, related_name='staffs', on_delete=models.CASCADE,null=True)
     name = models.CharField(max_length=255)
-    position = models.CharField(max_length=255)
+    services = models.ManyToManyField(Service, related_name='staffs',null=True, blank=True)
     image = models.ImageField(upload_to='staffs/images', null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     email = models.EmailField(null=True, blank=True)

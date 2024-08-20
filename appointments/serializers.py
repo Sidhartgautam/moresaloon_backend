@@ -19,6 +19,9 @@ class AppointmentSlotSerializer(serializers.ModelSerializer):
         service_variation = data.get('service_variation')
         buffer_time = data.get('buffer_time', timedelta(minutes=10))  # Default to 10 minutes if not provided
 
+        if not staff.services.filter(id=service.id).exists():
+            raise serializers.ValidationError("The selected staff member does not provide this service.")
+
         # Ensure that staff, date, and start_time are provided
         if not all([staff, date, start_time]):
             raise serializers.ValidationError("Staff, date, and start time are required.")
@@ -98,6 +101,9 @@ class AppointmentSerializer(serializers.ModelSerializer):
         start_time = data['start_time']
         service = data['service']
         buffer_time = data.get('buffer_time', timedelta(minutes=10))  # Default to 10 minutes if not provided
+
+        if not staff.services.filter(id=service.id).exists():
+            raise serializers.ValidationError("The selected staff member does not provide this service.")
 
         # Ensure the staff is working on the given day
         working_day = staff.working_days.filter(day_of_week=date.strftime('%A')).first()

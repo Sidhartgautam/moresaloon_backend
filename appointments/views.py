@@ -233,3 +233,29 @@ class AppointmentSlotDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
             message="Appointment slot deleted successfully"
         )
         return response.send(204)
+    
+
+class StaffAppointmentSlotListAPIView(generics.GenericAPIView):
+    serializer_class = AppointmentSlotSerializer
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self):
+        staff_id = self.kwargs.get('staff_id')  # Get staff_id from URL
+        queryset = AppointmentSlot.objects.filter(staff_id=staff_id, is_available=True)
+        return queryset
+
+    def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = self.get_serializer(page, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+        result = paginated_data['results']
+        del paginated_data['results']
+        response = PrepareResponse(
+            success=True,
+            message="Appointment slots for the staff fetched successfully",
+            data=result,
+            meta=paginated_data
+        )
+        return response.send(200)
