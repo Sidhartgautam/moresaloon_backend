@@ -5,7 +5,7 @@ from users.models import User
 from staffs.models import Staff
 import uuid
 from django.core.exceptions import ValidationError
-from datetime import datetime
+from datetime import datetime, timedelta
 
 APPOINTMENT_STATUS_CHOICES = [
     ('Pending', 'Pending'),
@@ -37,6 +37,7 @@ class AppointmentSlot(models.Model):
     date = models.DateField()
     start_time = models.TimeField()
     end_time = models.TimeField()
+    buffer_time = models.DurationField(default=timedelta(minutes=10),null=True, blank=True)
     is_available = models.BooleanField(default=True)
 
     def __str__(self):
@@ -88,6 +89,7 @@ class Appointment(models.Model):
     date = models.DateField()
     start_time = models.TimeField()
     end_time = models.TimeField()
+    buffer_time = models.DurationField(default=timedelta(minutes=10), null=True, blank=True)
     total_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=APPOINTMENT_STATUS_CHOICES, default='Pending')
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='Unpaid')

@@ -181,7 +181,7 @@ class AppointmentSlotListAPIView(generics.GenericAPIView):
 class AppointmentSlotCreateAPIView(generics.GenericAPIView):
     queryset = AppointmentSlot.objects.all()
     serializer_class = AppointmentSlotSerializer
-    permission_classes = [IsAdminUser]
+    # permission_classes = [IsAdminUser]
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

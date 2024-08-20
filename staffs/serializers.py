@@ -15,12 +15,17 @@ class WorkingDaySerializer(serializers.ModelSerializer):
         fields = ['day_of_week', 'start_time', 'end_time', 'break_times']
 
 class StaffSerializer(serializers.ModelSerializer):
-    working_days = WorkingDaySerializer(many=True, required=False)
+    # working_days = WorkingDaySerializer(many=True, required=False)
     saloon = serializers.PrimaryKeyRelatedField(queryset=Saloon.objects.all())
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = Staff
-        fields = ['id','saloon', 'name', 'position', 'working_days']
+        fields = ['id','saloon', 'name', 'position', 'image', 'description','email']
+
+    def get_image(self, obj):
+        image = obj.image.url if obj.image else None
+        return image
 
 class StaffAvailabilitySerializer(serializers.Serializer):
     staff_id = serializers.UUIDField(required=True)

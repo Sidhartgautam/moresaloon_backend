@@ -1,7 +1,7 @@
 from rest_framework import generics, status
 from .models import Staff, WorkingDay
 from rest_framework.permissions import IsAuthenticated
-from .serializers import StaffSerializer,StaffAvailabilitySerializer
+from .serializers import StaffSerializer, StaffAvailabilitySerializer
 from core.utils.response import PrepareResponse
 from appointments.models import Appointment
 from core.utils.pagination import CustomPageNumberPagination
@@ -9,7 +9,7 @@ from core.utils.pagination import CustomPageNumberPagination
 class StaffListView(generics.GenericAPIView):
     queryset = Staff.objects.all()
     serializer_class = StaffSerializer
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
@@ -73,11 +73,8 @@ class StaffAvailabilityView(generics.GenericAPIView):
             appointment_start_time = serializer.validated_data.get('start_time')
             appointment_end_time = serializer.validated_data.get('end_time')
 
-            try:
-                staff = Staff.objects.filter(id=staff_id, saloon_id=saloon_id).first()
-                if not staff:
-                    raise Staff.DoesNotExist
-            except Staff.DoesNotExist:
+            staff = Staff.objects.filter(id=staff_id, saloon_id=saloon_id).first()
+            if not staff:
                 response = PrepareResponse(success=False, message='Staff not found in the specified saloon.')
                 return response.send(404)
 
@@ -85,18 +82,23 @@ class StaffAvailabilityView(generics.GenericAPIView):
                 staff=staff,
                 day_of_week=appointment_date.strftime('%A')
             ).first()
-
+            
             if not working_day:
                 response = PrepareResponse(success=False, message='Staff is not available on this day.')
                 return response.send(400)
+            
+            print(f"Working Day: {working_day}")
+            print(f"Appointment Start Time: {appointment_start_time}")
+            print(f"Appointment End Time: {appointment_end_time}")
 
-            if not (working_day.start_time <= appointment_start_time <= working_day.end_time) or not (working_day.start_time <= appointment_end_time <= working_day.end_time):
+            if not (working_day.start_time <= appointment_start_time < working_day.end_time and
+                    working_day.start_time < appointment_end_time <= working_day.end_time):
                 response = PrepareResponse(success=False, message='Appointment time is outside of working hours.')
                 return response.send(400)
 
             break_times = working_day.break_times.all()
             for break_time in break_times:
-                if (break_time.break_start <= appointment_start_time < break_time.break_end) or (break_time.break_start < appointment_end_time <= break_time.break_end):
+                if (break_time.break_start < appointment_end_time and break_time.break_end > appointment_start_time):
                     response = PrepareResponse(success=False, message='Appointment overlaps with break time.')
                     return response.send(400)
 
@@ -115,3 +117,4 @@ class StaffAvailabilityView(generics.GenericAPIView):
             return response.send(400)
         
         return response.send(200)
+

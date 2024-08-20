@@ -1,12 +1,18 @@
 from django.db import models
 from saloons.models import Saloon
+# import uuid
 # from django.contrib.auth.models import User
 
 class Staff(models.Model):
+    # id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     # user = models.ForeignKey('users.User', on_delete=models.CASCADE)
     saloon = models.ForeignKey(Saloon, related_name='staffs', on_delete=models.CASCADE,null=True)
     name = models.CharField(max_length=255)
     position = models.CharField(max_length=255)
+    image = models.ImageField(upload_to='staffs/images', null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
+   
 
     def __str__(self):
         return f"{self.name} - {self.saloon.name if self.saloon else 'No Saloon'}"
