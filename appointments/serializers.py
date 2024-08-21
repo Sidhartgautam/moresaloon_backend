@@ -192,3 +192,5 @@ class AvailableSlotSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppointmentSlot
         fields = ['start_time', 'saloon', 'staff', 'service', 'is_available']
+
+

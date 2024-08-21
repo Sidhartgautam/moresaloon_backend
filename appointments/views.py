@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from core.utils.response import PrepareResponse
 from core.utils.moredealstoken import get_moredeals_token
 import stripe
+from datetime import datetime
 from staffs.models import Staff
 from django.conf import settings
 from django.core.mail import send_mail
@@ -259,9 +260,41 @@ class StaffAppointmentsListAPIView(generics.GenericAPIView):
         )
         return response.send(200)
     
+# class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
+#     serializer_class = AvailableSlotSerializer
+#     # permission_classes = [permissions.IsAuthenticated]
+
+#     def get_queryset(self):
+#         staff_id = self.kwargs.get('staff_id')
+#         date = self.request.query_params.get('date')
+#         queryset = AppointmentSlot.objects.filter(
+#             staff_id=staff_id, 
+#             is_available=True,     
+#         )
+
+#         if date:
+#             queryset = queryset.filter(date=date)
+        
+#         return queryset
+
+#     def get(self, request, *args, **kwargs):
+#         queryset = self.get_queryset()
+#         if not queryset.exists():
+#             response = PrepareResponse(
+#                 success=False,
+#                 message="No available slots found"
+#             )
+#             return response.send(404)
+#         serializer = self.get_serializer(queryset, many=True)
+#         response = PrepareResponse(
+#             success=True,
+#             message="Available slots fetched successfully",
+#             data=serializer.data
+#         )
+#         return response.send(200)
+
 class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
     serializer_class = AvailableSlotSerializer
-    # permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         staff_id = self.kwargs.get('staff_id')
@@ -273,11 +306,44 @@ class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
 
         if date:
             queryset = queryset.filter(date=date)
-        
+
         return queryset
 
     def get(self, request, *args, **kwargs):
+        date = self.request.query_params.get('date')
+        now_date = datetime.now().date()  # Current date without time
+
+        # Validate the date parameter
+        if date:
+            try:
+                query_date = datetime.strptime(date, "%Y-%m-%d").date()  # Convert date from string to date object
+            except ValueError:
+                response = PrepareResponse(
+                    success=False,
+                    message="Invalid date format provided.",
+                    data=None
+                )
+                return response.send(400)
+
+            if query_date < now_date:
+                response = PrepareResponse(
+                    success=False,
+                    message="The requested date is in the past.",
+                    data=None
+                )
+                return response.send(400)
+
+        # Get the filtered queryset
         queryset = self.get_queryset()
+        if not queryset.exists():
+            response = PrepareResponse(
+                success=False,
+                message="No available slots found.",
+                data=None
+            )
+            return response.send(404)
+
+        # Serialize the data
         serializer = self.get_serializer(queryset, many=True)
         response = PrepareResponse(
             success=True,
