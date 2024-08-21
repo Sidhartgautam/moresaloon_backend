@@ -6,10 +6,11 @@ from django.shortcuts import get_object_or_404
 from core.utils.response import PrepareResponse
 from core.utils.moredealstoken import get_moredeals_token
 import stripe
+from staffs.models import Staff
 from django.conf import settings
 from django.core.mail import send_mail
 from .models import Appointment, AppointmentSlot
-from .serializers import AppointmentSerializer, AppointmentSlotSerializer
+from .serializers import AppointmentSerializer, AppointmentSlotSerializer, AvailableSlotSerializer
 from saloons.models import Saloon
 from core.utils.pagination import CustomPageNumberPagination
 
@@ -28,14 +29,21 @@ class PlaceAppointmentAPIView(APIView):
             payment_method = serializer.validated_data.get('payment_method')
             appointment = None
 
+            # Create appointment and calculate pricing
+            appointment = serializer.save(user=request.user)
+            total_price = appointment.total_price  # Get the calculated total price
+
+            # Payment handling logic based on the payment method
             if payment_method == 'coa':
-                appointment = serializer.save(user=request.user)
+                # Cash on arrival, just create the appointment
+                pass
             elif payment_method == 'stripe':
                 try:
+                    # Ensure the frontend sends `payment_intent`
                     if request.data.get('payment_intent') is not None:
                         payment_confirm = stripe.PaymentIntent.retrieve(request.data.get('payment_intent'))
                         if payment_confirm['status'] == 'succeeded':
-                            appointment = serializer.save(user=request.user)
+                            pass
                         else:
                             raise ValueError("Payment failed with status: " + payment_confirm['status'])
                     else:
@@ -47,29 +55,16 @@ class PlaceAppointmentAPIView(APIView):
                     url = f"https://moretrek.com/api/payments/payment-through-balance/"
                     access_token = get_moredeals_token(request)
                     response = requests.post(url, data={
-                        'amount': serializer.validated_data['service'].price,
+                        'amount': total_price,
                         'pin': request.data.get('pin'),
                         'recipient': saloon.user.username,
                         'currency_code': saloon.currency.currency_code
                     }, headers={'Authorization': f"{access_token}"})
-                    if response.status_code == 200:
-                        appointment = serializer.save(user=request.user)
-                    else:
-                        errors = response.json()['errors']['non_field_errors'][0]
-                        response_json = PrepareResponse(
-                            success=False,
-                            message=errors,
-                            errors={"non_field_errors": [errors]}
-                        )
-                        return response_json.send(400)
+                    if response.status_code != 200:
+                        errors = response.json().get('errors', {}).get('non_field_errors', ['Payment failed'])
+                        return PrepareResponse(success=False, message=errors[0]).send(400)
                 else:
-                    response_json = PrepareResponse(
-                        success=False,
-                        message="PIN not provided for MoreDeals payment",
-                        errors={"non_field_errors": ["PIN not provided for MoreDeals payment"]}
-                    )
-                    return response_json.send(400)
-
+                    return PrepareResponse(success=False, message="PIN not provided for MoreDeals payment").send(400)
             if appointment:
                 send_mail(
                     'Appointment Confirmation',
@@ -77,21 +72,12 @@ class PlaceAppointmentAPIView(APIView):
                     'sender@example.com',
                     [saloon.email],
                 )
-                response = PrepareResponse(
-                    success=True,
-                    message="Appointment placed successfully",
-                    data=serializer.data
-                )
-                return response.send(200)
+                return PrepareResponse(success=True, message="Appointment placed successfully", data=serializer.data).send(200)
             else:
                 raise ValueError("Appointment processing failed")
         else:
-            response = PrepareResponse(
-                success=False,
-                data=serializer.errors,
-                message="Appointment failed"
-            )
-            return response.send(400)
+            return PrepareResponse(success=False, data=serializer.errors, message="Appointment failed").send(400)
+
 
 class UserAppointmentsListAPIView(generics.ListAPIView):
     serializer_class = AppointmentSerializer
@@ -157,15 +143,22 @@ class AppointmentSlotListAPIView(generics.GenericAPIView):
 
     def get_queryset(self):
         queryset = AppointmentSlot.objects.filter(is_available=True)
-        saloon_id = self.request.query_params.get('saloon_id')
+        saloon_id = self.kwargs.get('saloon_id')  
         staff_id =self.request.query_params.get('staff_id')
         date =self.request.query_params.get('date')
+        service_ids = self.request.query_params.get('service_ids')
+
+        queryset = AppointmentSlot.objects.filter(is_available=True)
+
         if saloon_id:
             queryset = queryset.filter(saloon_id=saloon_id)
         if staff_id:
             queryset = queryset.filter(staff_id=staff_id)
         if date:
             queryset = queryset.filter(date=date)
+        if service_ids:
+            staff_with_services = Staff.objects.filter(services__id__in=service_ids).distinct()
+            queryset = queryset.filter(staff__in=staff_with_services)
         return queryset
 
     def get(self, request, *args, **kwargs):
@@ -241,7 +234,7 @@ class AppointmentSlotDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
         return response.send(204)
     
 
-class StaffAppointmentSlotListAPIView(generics.GenericAPIView):
+class StaffAppointmentsListAPIView(generics.GenericAPIView):
     serializer_class = AppointmentSlotSerializer
     pagination_class = CustomPageNumberPagination
 
@@ -263,5 +256,32 @@ class StaffAppointmentSlotListAPIView(generics.GenericAPIView):
             message="Appointment slots for the staff fetched successfully",
             data=result,
             meta=paginated_data
+        )
+        return response.send(200)
+    
+class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
+    serializer_class = AvailableSlotSerializer
+    # permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        staff_id = self.kwargs.get('staff_id')
+        date = self.request.query_params.get('date')
+        queryset = AppointmentSlot.objects.filter(
+            staff_id=staff_id, 
+            is_available=True,     
+        )
+
+        if date:
+            queryset = queryset.filter(date=date)
+        
+        return queryset
+
+    def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        response = PrepareResponse(
+            success=True,
+            message="Available slots created by admin fetched successfully",
+            data=serializer.data
         )
         return response.send(200)

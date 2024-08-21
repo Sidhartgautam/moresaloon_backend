@@ -163,11 +163,15 @@ class StaffListByServiceAndSaloonAPIView(generics.GenericAPIView):
     serializer_class = StaffListSerializer
 
     def get_queryset(self):
-        service_id = self.request.query_params.get('service_id')  # Get the service ID from query parameters
-        saloon_id = self.request.query_params.get('saloon_id')  # Get the saloon ID from query parameters
-        queryset = Staff.objects.filter(saloon_id=saloon_id,services__id=service_id)
-        return queryset
-        
+        service_id = self.request.query_params.get('service_id') 
+        saloon_id = self.request.query_params.get('saloon_id') 
+
+        queryset = Staff.objects.filter(
+            saloon_id=saloon_id, 
+            services__id=service_id
+        ).select_related('saloon').prefetch_related('services')
+
+        return queryset    
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         if not queryset.exist():
