@@ -158,8 +158,14 @@ class AppointmentSlotListAPIView(generics.GenericAPIView):
     def get_queryset(self):
         queryset = AppointmentSlot.objects.filter(is_available=True)
         saloon_id = self.request.query_params.get('saloon_id')
+        staff_id =self.request.query_params.get('staff_id')
+        date =self.request.query_params.get('date')
         if saloon_id:
             queryset = queryset.filter(saloon_id=saloon_id)
+        if staff_id:
+            queryset = queryset.filter(staff_id=staff_id)
+        if date:
+            queryset = queryset.filter(date=date)
         return queryset
 
     def get(self, request, *args, **kwargs):

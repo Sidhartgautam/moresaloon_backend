@@ -5,10 +5,11 @@ from staffs.models import WorkingDay, BreakTime
 
 class AppointmentSlotSerializer(serializers.ModelSerializer):
     end_time = serializers.TimeField(read_only=True)
-    
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True) 
+    buffer_time = serializers.DurationField(default=timedelta(minutes=10))
     class Meta:
         model = AppointmentSlot
-        fields = ['id', 'saloon', 'staff', 'date', 'start_time', 'end_time', 'is_available', 'service', 'service_variation', 'buffer_time']
+        fields = ['id', 'saloon', 'staff', 'date', 'start_time', 'end_time', 'is_available', 'service', 'service_variation', 'buffer_time', 'total_price']
 
     def validate(self, data):
         # Extract the relevant fields

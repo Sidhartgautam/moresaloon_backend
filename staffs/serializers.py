@@ -21,7 +21,7 @@ class StaffSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Staff
-        fields = ['id','saloon', 'name', 'position', 'image', 'description','email']
+        fields = ['id','saloon', 'name', 'services', 'image', 'description','email']
 
     def get_image(self, obj):
         image = obj.image.url if obj.image else None

@@ -8,10 +8,9 @@ from core.utils.pagination import CustomPageNumberPagination
 
 from django.db.models import Q
 
-class StaffListView(generics.GenericAPIView):
+class StaffListCreateView(generics.GenericAPIView):
     queryset = Staff.objects.all()
     serializer_class = StaffSerializer
-    # permission_classes = [IsAuthenticated]
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
@@ -38,11 +37,6 @@ class StaffListView(generics.GenericAPIView):
             meta=paginated_data
         )
         return response.send(200)
-    
-class StaffCreateView(generics.GenericAPIView):
-    queryset = Staff.objects.all()
-    serializer_class = StaffSerializer
-    permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -54,7 +48,7 @@ class StaffCreateView(generics.GenericAPIView):
                 message="Staff member created successfully"
             )
             return response.send(201)
-        
+
         response = PrepareResponse(
             success=False,
             data=serializer.errors,
@@ -120,13 +114,14 @@ class StaffAvailabilityView(generics.GenericAPIView):
         
         return response.send(200)
     
-class StaffListOnlyView(generics.GenericAPIView):
+class StaffDetailView(generics.GenericAPIView):
     serializer_class = StaffListSerializer
 
     def get_queryset(self):
         staff_id = self.kwargs.get('staff_id')
         queryset = Staff.objects.filter(id=staff_id)
         return queryset
+
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         if not queryset.exists():
@@ -151,12 +146,9 @@ class StaffForServiceAPIView(generics.GenericAPIView):
     def get_queryset(self):
         service_id = self.request.query_params.get('service_id')  # Get the service ID from query parameters
         queryset = Staff.objects.all()
-
         if service_id:
             queryset = queryset.filter(services__id=service_id)  # Filter staff by the service
-
         return queryset
-
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
@@ -166,3 +158,28 @@ class StaffForServiceAPIView(generics.GenericAPIView):
             data=serializer.data
         )
         return response.send(200)
+    
+class StaffListByServiceAndSaloonAPIView(generics.GenericAPIView):
+    serializer_class = StaffListSerializer
+
+    def get_queryset(self):
+        service_id = self.request.query_params.get('service_id')  # Get the service ID from query parameters
+        saloon_id = self.request.query_params.get('saloon_id')  # Get the saloon ID from query parameters
+        queryset = Staff.objects.filter(saloon_id=saloon_id,services__id=service_id)
+        return queryset
+        
+    def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        if not queryset.exist():
+            return PrepareResponse(
+                success=False,
+                message="No staff found for the selected service and saloon"               
+            ).send (404)
+        serializer = self.get_serializer(queryset, many=True)
+        response = PrepareResponse(
+            success=True,
+            message="Staff members for the selected service and saloon fetched successfully",
+            data=serializer.data
+        )
+        return response.send(200)
+        
