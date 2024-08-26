@@ -82,11 +82,6 @@ class StaffAvailabilityView(generics.GenericAPIView):
             if not working_day:
                 response = PrepareResponse(success=False, message='Staff is not available on this day.')
                 return response.send(400)
-            
-            print(f"Working Day: {working_day}")
-            print(f"Appointment Start Time: {appointment_start_time}")
-            print(f"Appointment End Time: {appointment_end_time}")
-
             if not (working_day.start_time <= appointment_start_time < working_day.end_time and
                     working_day.start_time < appointment_end_time <= working_day.end_time):
                 response = PrepareResponse(success=False, message='Appointment time is outside of working hours.')
@@ -163,8 +158,10 @@ class StaffListByServiceAndSaloonAPIView(generics.GenericAPIView):
     serializer_class = StaffListSerializer
 
     def get_queryset(self):
-        service_id = self.request.query_params.get('service_id') 
-        saloon_id = self.request.query_params.get('saloon_id') 
+        # service_id = self.request.query_params.get('service_id') 
+        # saloon_id = self.request.query_params.get('saloon_id') 
+        service_id = self.kwargs.get('service_id')
+        saloon_id = self.kwargs.get('saloon_id')
 
         queryset = Staff.objects.filter(
             saloon_id=saloon_id, 
@@ -174,7 +171,7 @@ class StaffListByServiceAndSaloonAPIView(generics.GenericAPIView):
         return queryset    
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        if not queryset.exist():
+        if not queryset.exists():
             return PrepareResponse(
                 success=False,
                 message="No staff found for the selected service and saloon"               

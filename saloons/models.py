@@ -40,3 +40,15 @@ class Gallery(models.Model):
 
     def __str__(self):
         return f"Image for {self.saloon.name}"
+    
+class Amenities(models.Model):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+    saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+
+    def __str__(self):
+        return f"{self.name} - {self.saloon.name}"

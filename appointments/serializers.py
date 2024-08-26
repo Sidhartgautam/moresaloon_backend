@@ -6,12 +6,15 @@ from staffs.models import WorkingDay, BreakTime
 
 class AppointmentSlotSerializer(serializers.ModelSerializer):
     end_time = serializers.TimeField(read_only=True)
-    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True) 
+    price = serializers.SerializerMethodField()
     buffer_time = serializers.DurationField(default=timedelta(minutes=10))
     class Meta:
         model = AppointmentSlot
-        fields = ['id', 'saloon', 'staff', 'date', 'start_time', 'end_time', 'is_available', 'service', 'service_variation', 'buffer_time', 'total_price']
+        fields = ['id', 'saloon', 'staff', 'date', 'start_time', 'end_time', 'is_available', 'service', 'service_variation', 'buffer_time', 'price']
 
+    def get_price(self, obj):
+        return obj.service_variation.price
+   
     def validate(self, data):
         # Extract the relevant fields
         staff = data.get('staff')
@@ -21,11 +24,15 @@ class AppointmentSlotSerializer(serializers.ModelSerializer):
         service_variation = data.get('service_variation')
         buffer_time = data.get('buffer_time', timedelta(minutes=10))  # Default to 10 minutes if not provided
 
+        # Ensure that date is not in the past
+        if date and date < datetime.now().date():
+            raise serializers.ValidationError("The date cannot be in the past.")
+
         if not staff.services.filter(id=service.id).exists():
             raise serializers.ValidationError("The selected staff member does not provide this service.")
 
         # Ensure that staff, date, and start_time are provided
-        if not all([staff, date, start_time]):
+        if not all([staff, date, start_time,service_variation]):
             raise serializers.ValidationError("Staff, date, and start time are required.")
         
         # Ensure that either service or service_variation is provided
@@ -33,10 +40,7 @@ class AppointmentSlotSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Either service or service variation must be provided.")
 
         # Calculate end_time based on service or service_variation
-        if service_variation:
-            service_duration = service_variation.total_duration
-        elif service:
-            service_duration = service.base_duration
+        service_duration = service_variation.duration
 
         start_datetime = datetime.combine(date, start_time)
         end_datetime = start_datetime + service_duration
@@ -91,10 +95,10 @@ class AppointmentSlotSerializer(serializers.ModelSerializer):
 class AppointmentSerializer(serializers.ModelSerializer):
     # Allow selecting multiple services and service variations
     service = serializers.PrimaryKeyRelatedField(many=True, queryset=Service.objects.all())
-    service_variation = serializers.PrimaryKeyRelatedField(many=True, required=False, queryset=ServiceVariation.objects.all())
+    service_variation = serializers.PrimaryKeyRelatedField(many=True, required=True, queryset=ServiceVariation.objects.all())
     end_time = serializers.TimeField(read_only=True)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    buffer_time = serializers.DurationField(default=timedelta(minutes=10))  # Include buffer_time
+    buffer_time = serializers.DurationField(default=timedelta(minutes=10)) 
 
     class Meta:
         model = Appointment
@@ -119,6 +123,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
         date = data['date']
         start_time = data['start_time']
         services = data['service']
+        service_variations = data.get('service_variation', [])
         buffer_time = data.get('buffer_time', timedelta(minutes=10))
 
         # Ensure the selected staff can provide all the selected services
@@ -131,8 +136,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
         if not working_day:
             raise serializers.ValidationError(f"Staff is not working on {date.strftime('%A')}.")
 
-        # Calculate the total duration of services and the end time
-        total_duration = sum([service.base_duration for service in services], timedelta())
+         # Calculate the total duration based on service variations
+        total_duration = sum([variation.duration for variation in service_variations], timedelta())
         end_time = (datetime.combine(date, start_time) + total_duration + buffer_time).time()
         data['end_time'] = end_time
 
@@ -177,7 +182,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
         appointment.service_variation.set(service_variations)
 
         # Calculate the total price
-        total_price = sum([variation.total_price if variation else service.price for service, variation in zip(services, service_variations)])
+        total_price = sum([variation.total_price for variation in service_variations])
         appointment.total_price = total_price
         appointment.save()
 
@@ -192,5 +197,63 @@ class AvailableSlotSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppointmentSlot
         fields = ['start_time', 'saloon', 'staff', 'service', 'is_available']
+
+
+class AppointmentUpdateSerializer(serializers.ModelSerializer):
+    service = serializers.PrimaryKeyRelatedField(many=True, queryset=Service.objects.all(), required=False)
+    service_variation = serializers.PrimaryKeyRelatedField(many=True, required=False, queryset=ServiceVariation.objects.all())
+    end_time = serializers.TimeField(read_only=True)
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    buffer_time = serializers.DurationField(default=timedelta(minutes=10))
+
+    class Meta:
+        model = Appointment
+        fields = [
+            'user', 
+            'saloon', 
+            'service', 
+            'service_variation', 
+            'staff', 
+            'date', 
+            'start_time',
+            'end_time', 
+            'status', 
+            'payment_status', 
+            'payment_method', 
+            'total_price', 
+            'buffer_time'
+        ]
+
+    def update(self, instance, validated_data):
+        service_variations = validated_data.pop('service_variation', [])
+        services = validated_data.pop('service', [])
+
+        # Update the instance with new data
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if services:
+            instance.service.set(services)
+        if service_variations:
+            instance.service_variation.set(service_variations)
+
+        # Calculate total price based on updated service variations
+        total_price = sum([variation.price for variation in service_variations])
+        instance.total_price = total_price
+
+        # Calculate total duration considering services from different staff members
+        total_duration = timedelta()
+        for service_variation in service_variations:
+            total_duration += service_variation.duration
+
+        # Update the end_time based on the total duration and buffer_time
+        start_datetime = datetime.combine(instance.date, instance.start_time)
+        end_datetime = start_datetime + total_duration + instance.buffer_time
+        instance.end_time = end_datetime.time()
+        
+        instance.save()
+        return instance
+    
+
 
 

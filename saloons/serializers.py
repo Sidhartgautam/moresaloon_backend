@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from saloons.models import Saloon,Gallery
+from saloons.models import Saloon,Gallery,Amenities
 from review.serializers import ReviewSerializer
 
 class SaloonSerializer(serializers.ModelSerializer):
@@ -40,5 +40,11 @@ class SaloonDetailSerializer(serializers.ModelSerializer):
 
     def get_logo(self, obj):
         return obj.logo.url if obj.logo else None 
+    
+class AmenitiesSerializer(serializers.ModelSerializer):
+    saloon =serializers.StringRelatedField()
+    class Meta:
+        model = Amenities
+        fields = ['id','saloon','name']
  
         

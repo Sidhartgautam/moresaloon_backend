@@ -44,11 +44,12 @@ class AppointmentSlot(models.Model):
         return f"{self.saloon} - {self.staff} - {self.date} {self.start_time} - {self.end_time}"
     def clean(self):
         """
-        Custom validation to check for overlapping appointment slots.
+        Custom validation to check for overlapping appointment slots and ensure valid end time.
         """
         if self.start_time and self.end_time:
-            start_datetime = datetime.combine(self.date, self.start_time)
-            end_datetime = datetime.combine(self.date, self.end_time)
+            if self.end_time <= self.start_time:
+                raise ValidationError("End time must be after start time.")
+            
             overlapping_slots = AppointmentSlot.objects.filter(
                 staff=self.staff,
                 date=self.date,
@@ -58,23 +59,15 @@ class AppointmentSlot(models.Model):
 
             if overlapping_slots.exists():
                 raise ValidationError("The selected time slot overlaps with an existing appointment slot for this staff member.")
-        super().clean() 
+
+        super().clean()
 
     def save(self, *args, **kwargs):
-        if self.start_time and (self.service_variation or self.service):
+        if self.start_time and self.service_variation:
             start_datetime = datetime.combine(self.date, self.start_time)
-
-            if self.service_variation:
-                service_duration = self.service_variation.total_duration
-            else:
-                service_duration = self.service.base_duration
-            end_datetime = start_datetime + service_duration
+            end_datetime = start_datetime + self.service_variation.duration + (self.buffer_time or timedelta())
             self.end_time = end_datetime.time()
         
-        if self.service_variation:
-            self.total_price = self.service_variation.total_price
-        else:
-            self.total_price = self.service.price
         self.clean()
         super().save(*args, **kwargs)
     
@@ -132,28 +125,20 @@ class Appointment(models.Model):
             for break_time in working_day.break_times.all():
                 if break_time.break_start < self.end_time and break_time.break_end > self.start_time:
                     raise ValidationError("The appointment time overlaps with the staff's break time.")
-        
+    
     def save(self, *args, **kwargs):
-        # Calculate end time based on service durations
-        total_duration = timedelta()
-        for service in self.service.all():
-            total_duration += service.base_duration
+        if self.service_variation:
+            service_duration = self.service_variation.duration
+            total_price = self.service_variation.price
+        else:
+            service_duration = timedelta()
+            total_price = 0
         
         start_datetime = datetime.combine(self.date, self.start_time)
-        end_datetime = start_datetime + total_duration + self.buffer_time
+        end_datetime = start_datetime + service_duration + self.buffer_time
         self.end_time = end_datetime.time()
-
-        # Calculate total price based on service or service variation
-        total_price = 0
-        if self.service_variation.exists():
-            for variation in self.service_variation.all():
-                total_price += variation.total_price
-        else:
-            for service in self.service.all():
-                total_price += service.price
-
         self.total_price = total_price
 
-        # Perform clean validation before saving
         self.clean()
         super().save(*args, **kwargs)
+        

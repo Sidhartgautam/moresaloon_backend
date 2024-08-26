@@ -6,7 +6,9 @@ from .views import(
      GalleryUploadView, 
      PopularSaloonListView,
      NearestSaloonView,
-     GalleryListView
+     GalleryListView,
+     AmenitiesListView,
+     AmenitiesCreateView
 )
 
 urlpatterns = [
@@ -17,4 +19,6 @@ urlpatterns = [
     path('saloons/popular/', PopularSaloonListView.as_view(), name='popular-saloon-list'),
      path('nearest-saloons/', NearestSaloonView.as_view(), name='nearest-saloons'),
     path('<uuid:saloon_id>/gallerylist/', GalleryListView.as_view(), name='gallery-list'),
+    path('<uuid:saloon_id>/amenities/', AmenitiesListView.as_view(), name='gallery-list'),
+    path('amenities/create/', AmenitiesCreateView.as_view(), name='amenities-create'),
 ]

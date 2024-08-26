@@ -5,11 +5,14 @@ from rest_framework.permissions import IsAuthenticated,IsAdminUser
 from django.shortcuts import get_object_or_404
 from core.utils.response import PrepareResponse
 from core.utils.moredealstoken import get_moredeals_token
+from django.db import transaction
 import stripe
+from staffs.models import BreakTime
 from datetime import datetime
 from staffs.models import Staff
 from django.conf import settings
 from django.core.mail import send_mail
+from rest_framework.exceptions import ValidationError
 from .models import Appointment, AppointmentSlot
 from .serializers import AppointmentSerializer, AppointmentSlotSerializer, AvailableSlotSerializer
 from saloons.models import Saloon
@@ -18,39 +21,68 @@ from core.utils.pagination import CustomPageNumberPagination
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 class PlaceAppointmentAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, *args, **kwargs):
         data = request.data
         serializer = AppointmentSerializer(data=data, context={'request': request})
 
         if serializer.is_valid():
+            # Check for appointment slot and availability conflicts
+            staff = serializer.validated_data.get('staff')
+            start_time = serializer.validated_data.get('start_time')
+            end_time = serializer.validated_data.get('end_time')
+
+            # Ensure no overlapping appointments for the same staff
+            overlapping_appointments = Appointment.objects.filter(
+                staff=staff,
+                start_time__lt=end_time,
+                end_time__gt=start_time
+            ).exists()
+
+            if overlapping_appointments:
+                raise ValidationError("This time slot is already booked for the selected staff.")
+
+            # Check for staff break time conflicts
+            break_times = BreakTime.objects.filter(
+                working_day__staff=staff,
+                start_time__lt=end_time,
+                end_time__gt=start_time
+            )
+            if break_times.exists():
+                raise ValidationError("This time slot conflicts with the staff's break time.")
+
+            # Ensure no duplicate appointments for the same user in the same time slot
+            user = request.user
+            duplicate_appointments = Appointment.objects.filter(
+                user=user,
+                start_time__lt=end_time,
+                end_time__gt=start_time
+            ).exists()
+
+            if duplicate_appointments:
+                raise ValidationError("You already have an appointment during this time slot.")
+
+            # Handle payment and save the appointment
             saloon_id = serializer.validated_data.get('saloon').id
             saloon = get_object_or_404(Saloon, id=saloon_id)
             payment_method = serializer.validated_data.get('payment_method')
-            appointment = None
+            appointment = serializer.save(user=user)
+            total_price = appointment.total_price
 
-            # Create appointment and calculate pricing
-            appointment = serializer.save(user=request.user)
-            total_price = appointment.total_price  # Get the calculated total price
-
-            # Payment handling logic based on the payment method
             if payment_method == 'coa':
-                # Cash on arrival, just create the appointment
                 pass
             elif payment_method == 'stripe':
                 try:
-                    # Ensure the frontend sends `payment_intent`
                     if request.data.get('payment_intent') is not None:
                         payment_confirm = stripe.PaymentIntent.retrieve(request.data.get('payment_intent'))
-                        if payment_confirm['status'] == 'succeeded':
-                            pass
-                        else:
-                            raise ValueError("Payment failed with status: " + payment_confirm['status'])
+                        if payment_confirm['status'] != 'succeeded':
+                            raise ValidationError("Payment failed with status: " + payment_confirm['status'])
                     else:
-                        raise ValueError("Payment intent not provided")
+                        raise ValidationError("Payment intent not provided")
                 except stripe.error.StripeError as e:
-                    raise ValueError(f"Stripe error: {e.user_message}")
+                    raise ValidationError(f"Stripe error: {e.user_message}")
             elif payment_method == 'moredeals':
                 if request.data.get('pin') is not None:
                     url = f"https://moretrek.com/api/payments/payment-through-balance/"
@@ -66,6 +98,7 @@ class PlaceAppointmentAPIView(APIView):
                         return PrepareResponse(success=False, message=errors[0]).send(400)
                 else:
                     return PrepareResponse(success=False, message="PIN not provided for MoreDeals payment").send(400)
+
             if appointment:
                 send_mail(
                     'Appointment Confirmation',
@@ -75,7 +108,7 @@ class PlaceAppointmentAPIView(APIView):
                 )
                 return PrepareResponse(success=True, message="Appointment placed successfully", data=serializer.data).send(200)
             else:
-                raise ValueError("Appointment processing failed")
+                raise ValidationError("Appointment processing failed")
         else:
             return PrepareResponse(success=False, data=serializer.errors, message="Appointment failed").send(400)
 
@@ -105,7 +138,14 @@ class AppointmentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 
     def get(self, request, *args, **kwargs):
         appointment_id = self.kwargs.get(self.lookup_field)
-        appointment = get_object_or_404(Appointment, appointment_id=appointment_id)
+        try:
+            appointment = Appointment.objects.get(appointment_id=appointment_id)
+        except Appointment.DoesNotExist:
+            return PrepareResponse(
+                success=False,
+                message="Appointment not found"
+            ).send(404)
+
         serializer = self.get_serializer(appointment)
         response = PrepareResponse(
             success=True,
@@ -116,10 +156,18 @@ class AppointmentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 
     def put(self, request, *args, **kwargs):
         appointment_id = self.kwargs.get(self.lookup_field)
-        appointment = get_object_or_404(Appointment, appointment_id=appointment_id)
+        try:
+            appointment = Appointment.objects.get(appointment_id=appointment_id)
+        except Appointment.DoesNotExist:
+            return PrepareResponse(
+                success=False,
+                message="Appointment not found"
+            ).send(404)
+
         serializer = self.get_serializer(appointment, data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+
         response = PrepareResponse(
             success=True,
             data=serializer.data,
@@ -129,8 +177,16 @@ class AppointmentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 
     def delete(self, request, *args, **kwargs):
         appointment_id = self.kwargs.get(self.lookup_field)
-        appointment = get_object_or_404(Appointment, appointment_id=appointment_id)
+        try:
+            appointment = Appointment.objects.get(appointment_id=appointment_id)
+        except Appointment.DoesNotExist:
+            return PrepareResponse(
+                success=False,
+                message="Appointment not found"
+            ).send(404)
+
         appointment.delete()
+
         response = PrepareResponse(
             success=True,
             message="Appointment deleted successfully"
@@ -259,39 +315,6 @@ class StaffAppointmentsListAPIView(generics.GenericAPIView):
             meta=paginated_data
         )
         return response.send(200)
-    
-# class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
-#     serializer_class = AvailableSlotSerializer
-#     # permission_classes = [permissions.IsAuthenticated]
-
-#     def get_queryset(self):
-#         staff_id = self.kwargs.get('staff_id')
-#         date = self.request.query_params.get('date')
-#         queryset = AppointmentSlot.objects.filter(
-#             staff_id=staff_id, 
-#             is_available=True,     
-#         )
-
-#         if date:
-#             queryset = queryset.filter(date=date)
-        
-#         return queryset
-
-#     def get(self, request, *args, **kwargs):
-#         queryset = self.get_queryset()
-#         if not queryset.exists():
-#             response = PrepareResponse(
-#                 success=False,
-#                 message="No available slots found"
-#             )
-#             return response.send(404)
-#         serializer = self.get_serializer(queryset, many=True)
-#         response = PrepareResponse(
-#             success=True,
-#             message="Available slots fetched successfully",
-#             data=serializer.data
-#         )
-#         return response.send(200)
 
 class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
     serializer_class = AvailableSlotSerializer
@@ -312,8 +335,6 @@ class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         date = self.request.query_params.get('date')
         now_date = datetime.now().date()  # Current date without time
-
-        # Validate the date parameter
         if date:
             try:
                 query_date = datetime.strptime(date, "%Y-%m-%d").date()  # Convert date from string to date object
@@ -332,8 +353,6 @@ class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
                     data=None
                 )
                 return response.send(400)
-
-        # Get the filtered queryset
         queryset = self.get_queryset()
         if not queryset.exists():
             response = PrepareResponse(
@@ -342,8 +361,6 @@ class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
                 data=None
             )
             return response.send(404)
-
-        # Serialize the data
         serializer = self.get_serializer(queryset, many=True)
         response = PrepareResponse(
             success=True,
@@ -351,3 +368,23 @@ class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
             data=serializer.data
         )
         return response.send(200)
+    
+
+class AppointmentUpdateAPIView(generics.GenericAPIView):
+    serializer_class = AppointmentSlotSerializer
+    queryset = AppointmentSlot.objects.all()
+    lookup_field = 'id'
+
+    def put(self, request, *args, **kwargs):
+        appointment_slot = self.get_object()
+        serializer = self.get_serializer(appointment_slot, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        response = PrepareResponse(
+            success=True,
+            message="Appointment slot updated successfully",
+            data=serializer.data
+        )
+        return response.send(200)
+    
+

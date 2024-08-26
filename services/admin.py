@@ -1,19 +1,21 @@
 from django.contrib import admin
-from .models import ServiceCategory, Service, ServiceVariation, ServiceImage
+from .models import  Service, ServiceVariation, ServiceImage,ServiceVariationImage
 
-@admin.register(ServiceCategory)
-class ServiceCategoryAdmin(admin.ModelAdmin):
-    list_display = ['name']
 
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'base_duration']
+    list_display = ['name', 'max_duration','min_duration']
 
 @admin.register(ServiceVariation)
 class ServiceVariationAdmin(admin.ModelAdmin):
-    list_display = ['service', 'name', 'additional_duration', 'total_duration']
+    list_display = ['service', 'name', 'duration', 'price','description']
+    
 
 
 @admin.register(ServiceImage)
 class ServiceImageAdmin(admin.ModelAdmin):
     list_display = ['service', 'image']
+
+@admin.register(ServiceVariationImage)
+class ServiceVariationImageAdmin(admin.ModelAdmin):
+    list_display = ['variation', 'image']
