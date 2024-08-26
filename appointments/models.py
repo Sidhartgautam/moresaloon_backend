@@ -44,11 +44,12 @@ class AppointmentSlot(models.Model):
         return f"{self.saloon} - {self.staff} - {self.date} {self.start_time} - {self.end_time}"
     def clean(self):
         """
-        Custom validation to check for overlapping appointment slots.
+        Custom validation to check for overlapping appointment slots and ensure valid end time.
         """
         if self.start_time and self.end_time:
-            start_datetime = datetime.combine(self.date, self.start_time)
-            end_datetime = datetime.combine(self.date, self.end_time)
+            if self.end_time <= self.start_time:
+                raise ValidationError("End time must be after start time.")
+            
             overlapping_slots = AppointmentSlot.objects.filter(
                 staff=self.staff,
                 date=self.date,
@@ -58,23 +59,15 @@ class AppointmentSlot(models.Model):
 
             if overlapping_slots.exists():
                 raise ValidationError("The selected time slot overlaps with an existing appointment slot for this staff member.")
-        super().clean() 
+
+        super().clean()
 
     def save(self, *args, **kwargs):
-        if self.start_time and (self.service_variation or self.service):
+        if self.start_time and self.service_variation:
             start_datetime = datetime.combine(self.date, self.start_time)
-
-            if self.service_variation:
-                service_duration = self.service_variation.total_duration
-            else:
-                service_duration = self.service.base_duration
-            end_datetime = start_datetime + service_duration
+            end_datetime = start_datetime + self.service_variation.duration + (self.buffer_time or timedelta())
             self.end_time = end_datetime.time()
         
-        if self.service_variation:
-            self.total_price = self.service_variation.total_price
-        else:
-            self.total_price = self.service.price
         self.clean()
         super().save(*args, **kwargs)
     
@@ -83,8 +76,8 @@ class Appointment(models.Model):
     appointment_id = models.CharField(max_length=50, null=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE)
-    service = models.ForeignKey(Service, on_delete=models.CASCADE)
-    service_variation = models.ForeignKey('services.ServiceVariation', on_delete=models.CASCADE,null=True, blank=True)
+    service = models.ManyToManyField(Service, related_name='appointments',null=True, blank=True)
+    service_variation = models.ManyToManyField('services.ServiceVariation', related_name='appointments',null=True, blank=True)
     staff = models.ForeignKey(Staff, on_delete=models.CASCADE)
     date = models.DateField()
     start_time = models.TimeField()
@@ -100,25 +93,29 @@ class Appointment(models.Model):
         return f"{self.appointment_id}-{self.user} - {self.saloon} - {self.service} on {self.date} at {self.start_time}"
 
     def clean(self):
-        # Ensure the service and staff are from the same saloon as the appointment
-        if self.service.saloon != self.saloon:
-            raise ValidationError("The service must be from the same saloon as the appointment.")
+        # Ensure staff can provide all selected services
+        for service in self.service.all():
+            if not self.staff.services.filter(id=service.id).exists():
+                raise ValidationError(f"The staff cannot provide the service: {service.name}")
+        
+        # Ensure services and staff belong to the same saloon
+        if not all(service.saloon == self.saloon for service in self.service.all()):
+            raise ValidationError("The services must be from the same saloon as the appointment.")
         if self.staff.saloon != self.saloon:
             raise ValidationError("The staff must be from the same saloon as the appointment.")
         
-        # Validate that the appointment doesn't overlap with another appointment for the same staff
-        if self.start_time and self.end_time:  # Ensure both start_time and end_time are not None
-            overlapping_appointments = Appointment.objects.filter(
-                staff=self.staff,
-                date=self.date,
-                start_time__lt=self.end_time,
-                end_time__gt=self.start_time,
-            ).exists()
+        # Ensure no overlapping appointments for the same staff
+        overlapping_appointments = Appointment.objects.filter(
+            staff=self.staff,
+            date=self.date,
+            start_time__lt=self.end_time,
+            end_time__gt=self.start_time,
+        ).exclude(id=self.id).exists()
 
-            if overlapping_appointments:
-                raise ValidationError("This staff is already booked for the selected time slot.")
-
-        # Validate that the appointment falls within the staff's working hours
+        if overlapping_appointments:
+            raise ValidationError("This staff is already booked for the selected time slot.")
+        
+        # Check if the appointment falls within the staff's working hours
         working_day = self.staff.working_days.filter(day_of_week=self.date.strftime('%A')).first()
         if working_day and self.start_time and self.end_time:
             if not (working_day.start_time <= self.start_time < working_day.end_time):
@@ -126,27 +123,22 @@ class Appointment(models.Model):
 
             # Validate that the appointment doesn't overlap with a break
             for break_time in working_day.break_times.all():
-                if break_time.break_start and break_time.break_end:  # Ensure break_start and break_end are not None
-                    if break_time.break_start < self.end_time and break_time.break_end > self.start_time:
-                        raise ValidationError("The appointment time overlaps with a break.")
-
+                if break_time.break_start < self.end_time and break_time.break_end > self.start_time:
+                    raise ValidationError("The appointment time overlaps with the staff's break time.")
+    
     def save(self, *args, **kwargs):
-        # Calculate end_time based on service variation duration if provided, else use base service duration
-        if self.start_time and self.service_variation:
-            service_duration = self.service_variation.total_duration
-            start_datetime = datetime.combine(self.date, self.start_time)
-            end_datetime = start_datetime + service_duration
-            self.end_time = end_datetime.time()
-        elif self.start_time and self.service and not self.end_time:
-            service_duration = self.service.base_duration
-            start_datetime = datetime.combine(self.date, self.start_time)
-            end_datetime = start_datetime + service_duration
-            self.end_time = end_datetime.time()
-
-        # Calculate total price based on service or service variation price
         if self.service_variation:
-            self.total_price = self.service_variation.price
-        elif self.service:
-            self.total_price = self.service.price
+            service_duration = self.service_variation.duration
+            total_price = self.service_variation.price
+        else:
+            service_duration = timedelta()
+            total_price = 0
+        
+        start_datetime = datetime.combine(self.date, self.start_time)
+        end_datetime = start_datetime + service_duration + self.buffer_time
+        self.end_time = end_datetime.time()
+        self.total_price = total_price
 
+        self.clean()
         super().save(*args, **kwargs)
+        

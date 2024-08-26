@@ -4,26 +4,6 @@ from saloons.models import Saloon
 from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
-class ServiceCategory(models.Model):
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False
-    )
-    name = models.CharField(max_length=255)
-    saloon = models.ForeignKey(Saloon, related_name='service_categories', on_delete=models.CASCADE,null=True)
-    description = models.TextField(null=True, blank=True)
-    slug = models.SlugField(max_length=255, unique=True, null=True, blank=True)
-
-    def save(self, *args, **kwargs):
-        if not self.slug:
-            self.slug = slugify(self.name)
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.name} - {self.saloon.name}"
-    class Meta:
-        unique_together = ('saloon', 'name') 
 
 class Service(models.Model):
     id = models.UUIDField(
@@ -32,11 +12,27 @@ class Service(models.Model):
         editable=False
     )
     saloon = models.ForeignKey(Saloon, related_name='services', on_delete=models.CASCADE)
-    category = models.ForeignKey(ServiceCategory, related_name='services', on_delete=models.CASCADE)
+
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
-    base_duration = models.DurationField(help_text="Duration of the service (e.g., 1 hour, 30 minutes)")
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    min_duration = models.DurationField(help_text="Base duration of the service (e.g., 1 hour, 30 minutes)", null=True, blank=True)
+    max_duration = models.DurationField(help_text="Maximum duration of the service based on variations", null=True, blank=True)
+    slug = models.SlugField(max_length=255, unique=True, null=True, blank=True)
+
+    def update_durations(self):
+        variations = self.variations.all()
+        if variations.exists():
+            durations = [variation.duration for variation in variations]
+            self.min_duration = min(durations)
+            self.max_duration = max(durations)
+            self.save()
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+    class Meta:
+        unique_together = ('saloon', 'name') 
 
     def __str__(self):
         return f"{self.name} - {self.saloon.name}"
@@ -57,17 +53,19 @@ class ServiceImage(models.Model):
 class ServiceVariation(models.Model):
     id =models.UUIDField(primary_key=True,default=uuid.uuid4 ,editable=False)
     service =models.ForeignKey(Service,on_delete=models.CASCADE,related_name="variations")
+    description =models.TextField(null=True, blank=True,help_text="Description of the service variation")
     name =models.CharField(max_length=255)
-    additional_duration =models.DurationField(help_text="Duration of the service (e.g., 1 hour, 30 minutes)")
-    additional_price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Additional price for this variation",null=True, blank=True)
+    duration =models.DurationField(help_text="Duration of the service (e.g., 1 hour, 30 minutes)")
+    price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Additional price for this variation",null=True, blank=True)
 
     def __str__(self):
         return f"{self.name} - {self.service.name}"
+    
+class ServiceVariationImage(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    variation = models.ForeignKey(ServiceVariation, related_name='images', on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='services/service_variations/images')
 
-    @property
-    def total_duration(self):
-        return self.service.base_duration + self.additional_duration    
+    def __str__(self):
+        return f"Image for {self.variation.name}-{self.variation.service.saloon.name}"
 
-    @property
-    def total_price(self):
-        return self.service.price + self.additional_price    
