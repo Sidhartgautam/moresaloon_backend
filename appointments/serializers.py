@@ -3,6 +3,7 @@ from rest_framework import serializers
 from services.models import Service, ServiceVariation
 from .models import AppointmentSlot, Appointment
 from staffs.models import WorkingDay, BreakTime
+from core.utils.appointment import calculate_total_appointment_price
 
 class AppointmentSlotSerializer(serializers.ModelSerializer):
     end_time = serializers.TimeField(read_only=True)
@@ -182,7 +183,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
         appointment.service_variation.set(service_variations)
 
         # Calculate the total price
-        total_price = sum([variation.price for variation in service_variations])
+        total_price = calculate_total_appointment_price(services, service_variations)
         appointment.total_price = total_price
         appointment.save()
 
