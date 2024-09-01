@@ -17,6 +17,7 @@ from .models import Appointment, AppointmentSlot
 from .serializers import AppointmentSerializer, AppointmentSlotSerializer, AvailableSlotSerializer
 from saloons.models import Saloon
 from core.utils.pagination import CustomPageNumberPagination
+from core.utils.send_mail import send_appointment_confirmation_email
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -100,11 +101,10 @@ class PlaceAppointmentAPIView(APIView):
                     return PrepareResponse(success=False, message="PIN not provided for MoreDeals payment").send(400)
 
             if appointment:
-                send_mail(
+                send_appointment_confirmation_email.delay(
                     'Appointment Confirmation',
                     'Your appointment is confirmed.',
-                    'sender@example.com',
-                    [saloon.email],
+                    [saloon.email]  # Send to the saloon's email
                 )
                 return PrepareResponse(success=True, message="Appointment placed successfully", data=serializer.data).send(200)
             else:
@@ -297,7 +297,7 @@ class StaffAppointmentsListAPIView(generics.GenericAPIView):
 
     def get_queryset(self):
         staff_id = self.kwargs.get('staff_id')  # Get staff_id from URL
-        queryset = AppointmentSlot.objects.filter(staff_id=staff_id, is_available=True)
+        queryset = AppointmentSlot.objects.filter(staff_id=staff_id, is_available=True).order_by('start_time')
         return queryset
 
     def get(self, request, *args, **kwargs):
@@ -325,7 +325,7 @@ class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
         queryset = AppointmentSlot.objects.filter(
             staff_id=staff_id, 
             is_available=True,     
-        )
+        ).order_by('start_time')
 
         if date:
             queryset = queryset.filter(date=date)

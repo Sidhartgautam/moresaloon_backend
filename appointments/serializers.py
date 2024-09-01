@@ -182,7 +182,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
         appointment.service_variation.set(service_variations)
 
         # Calculate the total price
-        total_price = sum([variation.total_price for variation in service_variations])
+        total_price = sum([variation.price for variation in service_variations])
         appointment.total_price = total_price
         appointment.save()
 

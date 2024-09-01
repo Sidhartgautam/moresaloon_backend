@@ -35,10 +35,11 @@ class StaffAvailabilitySerializer(serializers.Serializer):
 
 class StaffListSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
+    appointment_slot_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Staff
-        fields = ['id', 'name', 'image']
+        fields = ['id', 'name', 'image', 'appointment_slot_count']
 
     def get_image(self, obj):
         image = obj.image.url if obj.image else None
