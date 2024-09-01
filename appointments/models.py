@@ -141,4 +141,9 @@ class Appointment(models.Model):
 
         self.clean()
         super().save(*args, **kwargs)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['staff', 'start_time', 'end_time']),
+        ]
         

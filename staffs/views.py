@@ -5,8 +5,7 @@ from .serializers import StaffSerializer, StaffAvailabilitySerializer, StaffList
 from core.utils.response import PrepareResponse
 from appointments.models import Appointment
 from core.utils.pagination import CustomPageNumberPagination
-
-from django.db.models import Q
+from django.db.models import Q, Count
 
 class StaffListCreateView(generics.GenericAPIView):
     queryset = Staff.objects.all()
@@ -158,24 +157,25 @@ class StaffListByServiceAndSaloonAPIView(generics.GenericAPIView):
     serializer_class = StaffListSerializer
 
     def get_queryset(self):
-        # service_id = self.request.query_params.get('service_id') 
-        # saloon_id = self.request.query_params.get('saloon_id') 
         service_id = self.kwargs.get('service_id')
         saloon_id = self.kwargs.get('saloon_id')
 
         queryset = Staff.objects.filter(
-            saloon_id=saloon_id, 
+            saloon_id=saloon_id,
             services__id=service_id
-        ).select_related('saloon').prefetch_related('services')
+        ).annotate(
+            appointment_slot_count=Count('appointmentslot', filter=Q(appointmentslot__service_id=service_id))
+        ).order_by('-appointment_slot_count')
 
-        return queryset    
+        return queryset
+
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         if not queryset.exists():
             return PrepareResponse(
                 success=False,
-                message="No staff found for the selected service and saloon"               
-            ).send (404)
+                message="No staff found for the selected service and saloon"
+            ).send(404)
         serializer = self.get_serializer(queryset, many=True)
         response = PrepareResponse(
             success=True,
