@@ -8,7 +8,7 @@ class ServiceVariationSerializer(serializers.ModelSerializer):
     saloon = serializers.PrimaryKeyRelatedField(queryset=Saloon.objects.all())
     class Meta:
         model = ServiceVariation
-        fields = ['id', 'name','saloon', 'duration','price','description','image']
+        fields = ['id', 'name','saloon','duration','price','description','image']
 
     def get_image(self, obj):
         image = ServiceVariationImage.objects.filter(service=obj.service).first()
@@ -54,13 +54,17 @@ class ServiceCreateUpdateSerializer(serializers.ModelSerializer):
 
 class NestedServiceVariationSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
-    saloon_id = serializers.SerializerMethodField(read_only=True)    
+    saloon_id = serializers.SerializerMethodField(read_only=True) 
+    service_id = serializers.SerializerMethodField(read_only=True)   
     class Meta:
         model = ServiceVariation
-        fields =['id','saloon_id','name','price','image','description','duration']
+        fields =['id','saloon_id','service_id','name','price','image','description','duration']
 
     def get_saloon_id(self, obj):
         return obj.service.saloon.id
+    
+    def get_service_id(self, obj):
+        return obj.service.id
 
     def get_image(self, obj):
         image = ServiceVariationImage.objects.filter(variation=obj).first()

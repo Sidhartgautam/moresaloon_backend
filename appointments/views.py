@@ -18,99 +18,165 @@ from .serializers import AppointmentSerializer, AppointmentSlotSerializer, Avail
 from saloons.models import Saloon
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.send_mail import send_appointment_confirmation_email
+from core.utils.appointment import calculate_total_appointment_price, book_appointment
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
-class PlaceAppointmentAPIView(APIView):
-    # permission_classes = [IsAuthenticated]
+# class PlaceAppointmentAPIView(APIView):
+#     # permission_classes = [IsAuthenticated]
 
-    @transaction.atomic
+#     @transaction.atomic
+#     def post(self, request, *args, **kwargs):
+#         data = request.data
+#         serializer = AppointmentSerializer(data=data, context={'request': request})
+
+#         if serializer.is_valid():
+#             # Check for appointment slot and availability conflicts
+#             staff = serializer.validated_data.get('staff')
+#             start_time = serializer.validated_data.get('start_time')
+#             end_time = serializer.validated_data.get('end_time')
+
+#             # Ensure no overlapping appointments for the same staff
+#             overlapping_appointments = Appointment.objects.filter(
+#                 staff=staff,
+#                 start_time__lt=end_time,
+#                 end_time__gt=start_time
+#             ).exists()
+
+#             if overlapping_appointments:
+#                 raise ValidationError("This time slot is already booked for the selected staff.")
+
+#             # Check for staff break time conflicts
+#             break_times = BreakTime.objects.filter(
+#                 working_day__staff=staff,
+#                 start_time__lt=end_time,
+#                 end_time__gt=start_time
+#             )
+#             if break_times.exists():
+#                 raise ValidationError("This time slot conflicts with the staff's break time.")
+
+#             # Ensure no duplicate appointments for the same user in the same time slot
+#             user = request.user
+#             duplicate_appointments = Appointment.objects.filter(
+#                 user=user,
+#                 start_time__lt=end_time,
+#                 end_time__gt=start_time
+#             ).exists()
+
+#             if duplicate_appointments:
+#                 raise ValidationError("You already have an appointment during this time slot.")
+
+#             # Handle payment and save the appointment
+#             saloon_id = serializer.validated_data.get('saloon').id
+#             saloon = get_object_or_404(Saloon, id=saloon_id)
+#             payment_method = serializer.validated_data.get('payment_method')
+#             appointment = serializer.save(user=user)
+#             total_price = appointment.total_price
+
+#             if payment_method == 'coa':
+#                 pass
+#             elif payment_method == 'stripe':
+#                 try:
+#                     if request.data.get('payment_intent') is not None:
+#                         payment_confirm = stripe.PaymentIntent.retrieve(request.data.get('payment_intent'))
+#                         if payment_confirm['status'] != 'succeeded':
+#                             raise ValidationError("Payment failed with status: " + payment_confirm['status'])
+#                     else:
+#                         raise ValidationError("Payment intent not provided")
+#                 except stripe.error.StripeError as e:
+#                     raise ValidationError(f"Stripe error: {e.user_message}")
+#             elif payment_method == 'moredeals':
+#                 if request.data.get('pin') is not None:
+#                     url = f"https://moretrek.com/api/payments/payment-through-balance/"
+#                     access_token = get_moredeals_token(request)
+#                     response = requests.post(url, data={
+#                         'amount': total_price,
+#                         'pin': request.data.get('pin'),
+#                         'recipient': saloon.user.username,
+#                         'currency_code': saloon.currency.currency_code
+#                     }, headers={'Authorization': f"{access_token}"})
+#                     if response.status_code != 200:
+#                         errors = response.json().get('errors', {}).get('non_field_errors', ['Payment failed'])
+#                         return PrepareResponse(success=False, message=errors[0]).send(400)
+#                 else:
+#                     return PrepareResponse(success=False, message="PIN not provided for MoreDeals payment").send(400)
+
+#             if appointment:
+#                 send_appointment_confirmation_email.delay(
+#                     'Appointment Confirmation',
+#                     'Your appointment is confirmed.',
+#                     [saloon.email]  # Send to the saloon's email
+#                 )
+#                 return PrepareResponse(success=True, message="Appointment placed successfully", data=serializer.data).send(200)
+#             else:
+#                 raise ValidationError("Appointment processing failed")
+#         else:
+#             return PrepareResponse(success=False, data=serializer.errors, message="Appointment failed").send(400)
+
+
+class BookAppointmentAPIView(APIView):
     def post(self, request, *args, **kwargs):
         data = request.data
         serializer = AppointmentSerializer(data=data, context={'request': request})
 
-        if serializer.is_valid():
-            # Check for appointment slot and availability conflicts
-            staff = serializer.validated_data.get('staff')
-            start_time = serializer.validated_data.get('start_time')
-            end_time = serializer.validated_data.get('end_time')
+        # Validate incoming data
+        if not serializer.is_valid():
+            return PrepareResponse(
+                success=False,
+                data=serializer.errors,
+                message="Appointment booking failed"
+            ).send(400)
 
-            # Ensure no overlapping appointments for the same staff
-            overlapping_appointments = Appointment.objects.filter(
-                staff=staff,
-                start_time__lt=end_time,
-                end_time__gt=start_time
-            ).exists()
+        # Retrieve saloon information
+        saloon_id = serializer.validated_data['saloon_id']
+        saloon = get_object_or_404(Saloon, id=saloon_id, country__code=request.country_code)
+        
+        # Retrieve service(s) being booked
+        services = serializer.validated_data.get('services')
+        if not services:
+            return PrepareResponse(
+                success=False,
+                message="Appointment booking failed",
+                errors={"non_field_errors": ["Please select at least one service"]}
+            ).send(400)
 
-            if overlapping_appointments:
-                raise ValidationError("This time slot is already booked for the selected staff.")
+        # Calculate the total appointment price
+        total_amount = calculate_total_appointment_price(request, services, saloon_id)
+        if total_amount is None:
+            return PrepareResponse(
+                success=False,
+                message="Appointment calculation failed",
+                errors={"non_field_errors": ["There was an issue with the service selection."]}
+            ).send(400)
 
-            # Check for staff break time conflicts
-            break_times = BreakTime.objects.filter(
-                working_day__staff=staff,
-                start_time__lt=end_time,
-                end_time__gt=start_time
-            )
-            if break_times.exists():
-                raise ValidationError("This time slot conflicts with the staff's break time.")
+        # Handle payment and booking logic
+        payment_method = serializer.validated_data.get('payment_method')
+        payment_method_id = serializer.validated_data.get('payment_method_id')
 
-            # Ensure no duplicate appointments for the same user in the same time slot
-            user = request.user
-            duplicate_appointments = Appointment.objects.filter(
-                user=user,
-                start_time__lt=end_time,
-                end_time__gt=start_time
-            ).exists()
+        # Process the booking
+        status, appointment = self.process_payment(request, payment_method, payment_method_id, total_amount, saloon, data)
+        
+        if not status:
+            return PrepareResponse(
+                success=False,
+                message="Appointment booking failed",
+                errors={"non_field_errors": [appointment]}
+            ).send(400)
 
-            if duplicate_appointments:
-                raise ValidationError("You already have an appointment during this time slot.")
+        # Send appointment confirmation emails
+        send_appointment_confirmation_email.delay(appointment, serializer, saloon, request)
 
-            # Handle payment and save the appointment
-            saloon_id = serializer.validated_data.get('saloon').id
-            saloon = get_object_or_404(Saloon, id=saloon_id)
-            payment_method = serializer.validated_data.get('payment_method')
-            appointment = serializer.save(user=user)
-            total_price = appointment.total_price
+        return PrepareResponse(
+            success=True,
+            message="Appointment booked successfully",
+            data=serializer.data
+        ).send(200)
 
-            if payment_method == 'coa':
-                pass
-            elif payment_method == 'stripe':
-                try:
-                    if request.data.get('payment_intent') is not None:
-                        payment_confirm = stripe.PaymentIntent.retrieve(request.data.get('payment_intent'))
-                        if payment_confirm['status'] != 'succeeded':
-                            raise ValidationError("Payment failed with status: " + payment_confirm['status'])
-                    else:
-                        raise ValidationError("Payment intent not provided")
-                except stripe.error.StripeError as e:
-                    raise ValidationError(f"Stripe error: {e.user_message}")
-            elif payment_method == 'moredeals':
-                if request.data.get('pin') is not None:
-                    url = f"https://moretrek.com/api/payments/payment-through-balance/"
-                    access_token = get_moredeals_token(request)
-                    response = requests.post(url, data={
-                        'amount': total_price,
-                        'pin': request.data.get('pin'),
-                        'recipient': saloon.user.username,
-                        'currency_code': saloon.currency.currency_code
-                    }, headers={'Authorization': f"{access_token}"})
-                    if response.status_code != 200:
-                        errors = response.json().get('errors', {}).get('non_field_errors', ['Payment failed'])
-                        return PrepareResponse(success=False, message=errors[0]).send(400)
-                else:
-                    return PrepareResponse(success=False, message="PIN not provided for MoreDeals payment").send(400)
-
-            if appointment:
-                send_appointment_confirmation_email.delay(
-                    'Appointment Confirmation',
-                    'Your appointment is confirmed.',
-                    [saloon.email]  # Send to the saloon's email
-                )
-                return PrepareResponse(success=True, message="Appointment placed successfully", data=serializer.data).send(200)
-            else:
-                raise ValidationError("Appointment processing failed")
-        else:
-            return PrepareResponse(success=False, data=serializer.errors, message="Appointment failed").send(400)
+    def process_payment(self, request, payment_method, payment_method_id, total_amount, saloon, data):
+        # If payment is cash on delivery (or pay at salon)
+        if payment_method == 'cod':
+            return book_appointment(request, data)
+        return False, "Invalid payment method"
 
 
 class UserAppointmentsListAPIView(generics.ListAPIView):
