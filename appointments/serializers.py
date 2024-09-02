@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 from rest_framework import serializers
+from saloons.models import Saloon
+from staffs.models import Staff
 from services.models import Service, ServiceVariation
 from .models import AppointmentSlot, Appointment
 from staffs.models import WorkingDay, BreakTime
@@ -95,11 +97,14 @@ class AppointmentSlotSerializer(serializers.ModelSerializer):
 
 class AppointmentSerializer(serializers.ModelSerializer):
     # Allow selecting multiple services and service variations
-    service = serializers.PrimaryKeyRelatedField(many=True, queryset=Service.objects.all())
+    saloon = serializers.UUIDField()
+    service =serializers.PrimaryKeyRelatedField( queryset=Service.objects.all())
     service_variation = serializers.PrimaryKeyRelatedField(many=True, required=True, queryset=ServiceVariation.objects.all())
     end_time = serializers.TimeField(read_only=True)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     buffer_time = serializers.DurationField(default=timedelta(minutes=10)) 
+    staff = serializers.PrimaryKeyRelatedField(queryset=Staff.objects.all())
+    
 
     class Meta:
         model = Appointment
@@ -119,18 +124,18 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'buffer_time'
         ]
 
+
     def validate(self, data):
         staff = data['staff']
         date = data['date']
         start_time = data['start_time']
-        services = data['service']
+        service = data['service']
         service_variations = data.get('service_variation', [])
         buffer_time = data.get('buffer_time', timedelta(minutes=10))
 
         # Ensure the selected staff can provide all the selected services
-        for service in services:
-            if not staff.services.filter(id=service.id).exists():
-                raise serializers.ValidationError(f"The selected staff member does not provide the service: {service.name}")
+        if not staff.service.filter(id=service.id).exists():
+            raise serializers.ValidationError(f"The selected staff member does not provide the service: {service.name}")
 
         # Ensure the staff is working on the selected day
         working_day = staff.working_days.filter(day_of_week=date.strftime('%A')).first()
@@ -175,15 +180,15 @@ class AppointmentSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        services = validated_data.pop('service')
+        service = validated_data.pop('service')
         service_variations = validated_data.pop('service_variation', [])
 
         appointment = Appointment.objects.create(**validated_data)
-        appointment.service.set(services)
+        appointment.service.set(service)
         appointment.service_variation.set(service_variations)
 
         # Calculate the total price
-        total_price = calculate_total_appointment_price(services, service_variations)
+        total_price = calculate_total_appointment_price(service, service_variations)
         appointment.total_price = total_price
         appointment.save()
 

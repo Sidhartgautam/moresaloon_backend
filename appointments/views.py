@@ -118,44 +118,42 @@ class BookAppointmentAPIView(APIView):
     def post(self, request, *args, **kwargs):
         data = request.data
         serializer = AppointmentSerializer(data=data, context={'request': request})
-
-        # Validate incoming data
+        
+        # Validate the serializer
         if not serializer.is_valid():
             return PrepareResponse(
                 success=False,
                 data=serializer.errors,
                 message="Appointment booking failed"
             ).send(400)
-
-        # Retrieve saloon information
-        saloon_id = serializer.validated_data['saloon_id']
-        saloon = get_object_or_404(Saloon, id=saloon_id, country__code=request.country_code)
         
-        # Retrieve service(s) being booked
-        services = serializer.validated_data.get('services')
-        if not services:
+        # Retrieve necessary data from the serializer
+        saloon_id = serializer.validated_data['saloon']
+        service_variations = serializer.validated_data.get('service_variation')
+        staff_id = serializer.validated_data.get('staff')
+        service_id = serializer.validated_data.get('service')
+        slot_id = serializer.validated_data.get('appointment_slot')  # Extract slot_id here
+
+        # Ensure slot_id is not None and slot exists
+        try:
+            slot = AppointmentSlot.objects.get(id=slot_id, staff=staff_id, is_available=True)
+        except AppointmentSlot.DoesNotExist:
             return PrepareResponse(
                 success=False,
-                message="Appointment booking failed",
-                errors={"non_field_errors": ["Please select at least one service"]}
+                message="Selected appointment slot does not exist or is not available.",
+                errors={"appointment_slot": ["Invalid or unavailable appointment slot."]}
             ).send(400)
 
-        # Calculate the total appointment price
-        total_amount = calculate_total_appointment_price(request, services, saloon_id)
-        if total_amount is None:
-            return PrepareResponse(
-                success=False,
-                message="Appointment calculation failed",
-                errors={"non_field_errors": ["There was an issue with the service selection."]}
-            ).send(400)
-
-        # Handle payment and booking logic
+        # Continue with the rest of your logic
+        saloon = get_object_or_404(Saloon, id=saloon_id)
+        total_amount = calculate_total_appointment_price(service_variations)
         payment_method = serializer.validated_data.get('payment_method')
-        payment_method_id = serializer.validated_data.get('payment_method_id')
-
-        # Process the booking
-        status, appointment = self.process_payment(request, payment_method, payment_method_id, total_amount, saloon, data)
         
+        # Process the booking
+        status, appointment = self.process_payment(
+            request, payment_method, total_amount, saloon_id, staff_id.id, service_id.id, slot.id  
+        )
+
         if not status:
             return PrepareResponse(
                 success=False,
@@ -163,8 +161,8 @@ class BookAppointmentAPIView(APIView):
                 errors={"non_field_errors": [appointment]}
             ).send(400)
 
-        # Send appointment confirmation emails
-        send_appointment_confirmation_email.delay(appointment, serializer, saloon, request)
+        # Send confirmation email
+        send_appointment_confirmation_email.delay(appointment, serializer, saloon_id, request)
 
         return PrepareResponse(
             success=True,
@@ -172,11 +170,11 @@ class BookAppointmentAPIView(APIView):
             data=serializer.data
         ).send(200)
 
-    def process_payment(self, request, payment_method, payment_method_id, total_amount, saloon, data):
-        # If payment is cash on delivery (or pay at salon)
-        if payment_method == 'cod':
-            return book_appointment(request, data)
+    def process_payment(self, request, payment_method, total_amount, saloon_id, staff_id, service_id, slot_id):
+        if payment_method == 'coa':
+            return book_appointment(request.user, saloon_id, staff_id, service_id, slot_id)
         return False, "Invalid payment method"
+
 
 
 class UserAppointmentsListAPIView(generics.ListAPIView):

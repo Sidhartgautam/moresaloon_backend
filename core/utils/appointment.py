@@ -5,27 +5,37 @@ from appointments.models import Appointment, AppointmentSlot
 from staffs.models import Staff
 from services.models import Service, ServiceVariation
 from saloons.models import Saloon
-def calculate_total_appointment_price(services, service_variations):
+
+def calculate_total_appointment_price( service_variations):
     """
-    Calculate the total price based on services and service variations.
+    Calculate the total price based on service variations.
     """
     total_price = 0
+
     for variation in service_variations:
-        total_price += variation.price  
+        # Assume `variation` is an instance of `ServiceVariation`
+        total_price += variation.price
+
     return total_price
 
 
 
 
 def book_appointment(user, saloon_id, staff_id, service_id, slot_id):
+    # try:
+    print("Staff id", staff_id)
+    saloon = Saloon.objects.get(id=saloon_id)
+    staff = Staff.objects.get(id=staff_id, saloon=saloon)
+    service = Service.objects.get(id=service_id, saloon=saloon)
+    # slot = AppointmentSlot.objects.get(id=slot_id, staff=staff, is_available=True)
+    print(f"Slot ID: {slot_id}, Staff ID: {staff_id}, Service ID: {service_id}")
 
+    # except (Saloon.DoesNotExist, Staff.DoesNotExist, Service.DoesNotExist, AppointmentSlot.DoesNotExist):
+    #     raise ValidationError("Invalid saloon, staff, service, or slot.")
     try:
-        saloon = Saloon.objects.get(id=saloon_id)
-        staff = Staff.objects.get(id=staff_id, saloon=saloon)
-        service = Service.objects.get(id=service_id, saloon=saloon)
         slot = AppointmentSlot.objects.get(id=slot_id, staff=staff, is_available=True)
-    except (Saloon.DoesNotExist, Staff.DoesNotExist, Service.DoesNotExist, AppointmentSlot.DoesNotExist):
-        raise ValidationError("Invalid saloon, staff, service, or slot.")
+    except AppointmentSlot.DoesNotExist:
+            raise ValidationError(f"Slot with ID {slot_id} for staff {staff_id} is not available or does not exist.")
 
     service_duration = service.base_duration
     if service.variations:
