@@ -93,56 +93,6 @@ class Appointment(models.Model):
     def __str__(self):
         return f"{self.appointment_id}-{self.user} - {self.saloon} - {self.service} on {self.date} at {self.start_time}"
 
-    def clean(self):
-        # Ensure staff can provide all selected services
-        for service in self.service.all():
-            if not self.staff.services.filter(id=service.id).exists():
-                raise ValidationError(f"The staff cannot provide the service: {service.name}")
-        
-        # Ensure services and staff belong to the same saloon
-        if not all(service.saloon == self.saloon for service in self.service.all()):
-            raise ValidationError("The services must be from the same saloon as the appointment.")
-        if self.staff.saloon != self.saloon:
-            raise ValidationError("The staff must be from the same saloon as the appointment.")
-        
-        # Ensure no overlapping appointments for the same staff
-        overlapping_appointments = Appointment.objects.filter(
-            staff=self.staff,
-            date=self.date,
-            start_time__lt=self.end_time,
-            end_time__gt=self.start_time,
-        ).exclude(id=self.id).exists()
-
-        if overlapping_appointments:
-            raise ValidationError("This staff is already booked for the selected time slot.")
-        
-        # Check if the appointment falls within the staff's working hours
-        working_day = self.staff.working_days.filter(day_of_week=self.date.strftime('%A')).first()
-        if working_day and self.start_time and self.end_time:
-            if not (working_day.start_time <= self.start_time < working_day.end_time):
-                raise ValidationError("The selected time is outside of the staff's working hours.")
-
-            # Validate that the appointment doesn't overlap with a break
-            for break_time in working_day.break_times.all():
-                if break_time.break_start < self.end_time and break_time.break_end > self.start_time:
-                    raise ValidationError("The appointment time overlaps with the staff's break time.")
-    
-    def save(self, *args, **kwargs):
-        if self.service_variation:
-            service_duration = self.service_variation.duration
-            total_price = self.service_variation.price
-        else:
-            service_duration = timedelta()
-            total_price = 0
-        
-        start_datetime = datetime.combine(self.date, self.start_time)
-        end_datetime = start_datetime + service_duration + self.buffer_time
-        self.end_time = end_datetime.time()
-        self.total_price = total_price
-
-        self.clean()
-        super().save(*args, **kwargs)
-
     class Meta:
         indexes = [
             models.Index(fields=['staff', 'start_time', 'end_time']),

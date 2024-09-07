@@ -42,7 +42,7 @@ class SaloonDetailSerializer(serializers.ModelSerializer):
         return obj.logo.url if obj.logo else None 
     
 class AmenitiesSerializer(serializers.ModelSerializer):
-    saloon =serializers.StringRelatedField()
+    saloon =serializers.PrimaryKeyRelatedField(queryset=Saloon.objects.all(),required=True)
     class Meta:
         model = Amenities
         fields = ['id','saloon','name']

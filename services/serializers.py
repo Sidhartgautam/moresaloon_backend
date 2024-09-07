@@ -5,14 +5,16 @@ from saloons.models import Saloon
 
 class ServiceVariationSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
-    saloon = serializers.PrimaryKeyRelatedField(queryset=Saloon.objects.all())
+    saloon = serializers.SerializerMethodField() 
     class Meta:
         model = ServiceVariation
         fields = ['id', 'name','saloon','duration','price','description','image']
 
     def get_image(self, obj):
-        image = ServiceVariationImage.objects.filter(service=obj.service).first()
+        image = ServiceVariationImage.objects.filter(variation=obj).first()  # 'variation=obj' instead of 'service=obj.service'
         return image.image.url if image else None
+    def get_saloon(self, obj):
+       return obj.service.saloon.id if obj.service and obj.service.saloon else None
 
 
 class ServiceVariationImageSerializer(serializers.ModelSerializer):
