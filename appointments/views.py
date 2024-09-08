@@ -9,6 +9,7 @@ from django.db import transaction
 import stripe
 from staffs.models import BreakTime
 from datetime import datetime
+from services.models import Service, ServiceVariation
 from staffs.models import Staff
 from django.conf import settings
 from django.core.mail import send_mail
@@ -18,164 +19,195 @@ from .serializers import AppointmentSerializer, AppointmentSlotSerializer, Avail
 from saloons.models import Saloon
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.send_mail import send_appointment_confirmation_email
-from core.utils.appointment import calculate_total_appointment_price, book_appointment
+from core.utils.appointment import calculate_total_appointment_price, book_appointment,calculate_appointment_end_time
+from datetime import datetime,timedelta
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
-# class PlaceAppointmentAPIView(APIView):
-#     # permission_classes = [IsAuthenticated]
-
-#     @transaction.atomic
+# class BookAppointmentAPIView(APIView):
 #     def post(self, request, *args, **kwargs):
 #         data = request.data
+#         print(request.data)
+        
+#         # Check if the user is authenticated
+#         if not request.user.is_authenticated:
+#             return PrepareResponse(
+#                 success=False,
+#                 message="Authentication required.",
+#                 errors={"non_field_errors": ["User must be authenticated to book an appointment."]}
+#             ).send(403)  # Or another status code if unauthenticated users are allowed to book
+
 #         serializer = AppointmentSerializer(data=data, context={'request': request})
 
-#         if serializer.is_valid():
-#             # Check for appointment slot and availability conflicts
-#             staff = serializer.validated_data.get('staff')
-#             start_time = serializer.validated_data.get('start_time')
-#             end_time = serializer.validated_data.get('end_time')
+#         if not serializer.is_valid():
+#             return PrepareResponse(
+#                 success=False,
+#                 data=serializer.errors,
+#                 message="Appointment booking failed"
+#             ).send(400)
 
-#             # Ensure no overlapping appointments for the same staff
-#             overlapping_appointments = Appointment.objects.filter(
-#                 staff=staff,
-#                 start_time__lt=end_time,
-#                 end_time__gt=start_time
-#             ).exists()
+#         saloon_id = serializer.validated_data['saloon']
+#         print("saloon_id", saloon_id)
+#         service_variations = serializer.validated_data['service_variation']
+#         print("service_variations", service_variations)
+#         staff_id = serializer.validated_data['staff']
+#         print("staff_id", staff_id)
+#         service_id = serializer.validated_data['service']
+#         print("service_id", service_id)
+#         slot_id = serializer.validated_data['appointment_slot']
+#         print("slot_id", slot_id)
 
-#             if overlapping_appointments:
-#                 raise ValidationError("This time slot is already booked for the selected staff.")
+#         if not service_variations:
+#             return PrepareResponse(
+#                 success=False,
+#                 message="Service variations are required."
+#             ).send(400)
 
-#             # Check for staff break time conflicts
-#             break_times = BreakTime.objects.filter(
-#                 working_day__staff=staff,
-#                 start_time__lt=end_time,
-#                 end_time__gt=start_time
-#             )
-#             if break_times.exists():
-#                 raise ValidationError("This time slot conflicts with the staff's break time.")
+#         service_variation_id = service_variations[0]
+#         print("service_variation_id", service_variation_id)
 
-#             # Ensure no duplicate appointments for the same user in the same time slot
-#             user = request.user
-#             duplicate_appointments = Appointment.objects.filter(
-#                 user=user,
-#                 start_time__lt=end_time,
-#                 end_time__gt=start_time
-#             ).exists()
+#         try:
+#             slot = AppointmentSlot.objects.get(id=slot_id, staff_id=staff_id, is_available=True)
+#         except AppointmentSlot.DoesNotExist:
+#             return PrepareResponse(
+#                 success=False,
+#                 message="Appointment booking failed",
+#                 errors={"non_field_errors": ["Slot not available"]}
+#             ).send(400)
 
-#             if duplicate_appointments:
-#                 raise ValidationError("You already have an appointment during this time slot.")
+#         total_amount = calculate_total_appointment_price(service_variations)
+#         payment_method = serializer.validated_data.get('payment_method')
 
-#             # Handle payment and save the appointment
-#             saloon_id = serializer.validated_data.get('saloon').id
-#             saloon = get_object_or_404(Saloon, id=saloon_id)
-#             payment_method = serializer.validated_data.get('payment_method')
-#             appointment = serializer.save(user=user)
-#             total_price = appointment.total_price
+#         status, appointment_or_error = self.process_payment(
+#             request, payment_method, total_amount, saloon_id, staff_id, service_id, slot_id, service_variation_id
+#         )
+#         print("status", status)
 
-#             if payment_method == 'coa':
-#                 pass
-#             elif payment_method == 'stripe':
-#                 try:
-#                     if request.data.get('payment_intent') is not None:
-#                         payment_confirm = stripe.PaymentIntent.retrieve(request.data.get('payment_intent'))
-#                         if payment_confirm['status'] != 'succeeded':
-#                             raise ValidationError("Payment failed with status: " + payment_confirm['status'])
-#                     else:
-#                         raise ValidationError("Payment intent not provided")
-#                 except stripe.error.StripeError as e:
-#                     raise ValidationError(f"Stripe error: {e.user_message}")
-#             elif payment_method == 'moredeals':
-#                 if request.data.get('pin') is not None:
-#                     url = f"https://moretrek.com/api/payments/payment-through-balance/"
-#                     access_token = get_moredeals_token(request)
-#                     response = requests.post(url, data={
-#                         'amount': total_price,
-#                         'pin': request.data.get('pin'),
-#                         'recipient': saloon.user.username,
-#                         'currency_code': saloon.currency.currency_code
-#                     }, headers={'Authorization': f"{access_token}"})
-#                     if response.status_code != 200:
-#                         errors = response.json().get('errors', {}).get('non_field_errors', ['Payment failed'])
-#                         return PrepareResponse(success=False, message=errors[0]).send(400)
-#                 else:
-#                     return PrepareResponse(success=False, message="PIN not provided for MoreDeals payment").send(400)
+#         if not status:
+#             return PrepareResponse(
+#                 success=False,
+#                 message="Appointment booking failed",
+#                 errors={"non_field_errors": [appointment_or_error]}
+#             ).send(400)
 
-#             if appointment:
-#                 send_appointment_confirmation_email.delay(
-#                     'Appointment Confirmation',
-#                     'Your appointment is confirmed.',
-#                     [saloon.email]  # Send to the saloon's email
-#                 )
-#                 return PrepareResponse(success=True, message="Appointment placed successfully", data=serializer.data).send(200)
-#             else:
-#                 raise ValidationError("Appointment processing failed")
-#         else:
-#             return PrepareResponse(success=False, data=serializer.errors, message="Appointment failed").send(400)
+#         send_appointment_confirmation_email.delay(appointment_or_error, serializer, saloon_id, request)
 
+#         return PrepareResponse(
+#             success=True,
+#             message="Appointment booked successfully",
+#             data=serializer.data
+#         ).send(200)
 
+#     def process_payment(self, request, payment_method, total_amount, saloon_id, staff_id, service_id, slot_id, service_variation_id):
+#         if payment_method == 'coa':
+#             # Pass the user to book_appointment
+#             return book_appointment(request.user, saloon_id, staff_id, service_id, slot_id, service_variation_id)
+#         return False
 class BookAppointmentAPIView(APIView):
     def post(self, request, *args, **kwargs):
         data = request.data
+
+        if not request.user.is_authenticated:
+            return PrepareResponse(
+                success=False,
+                message="Authentication required.",
+                errors={"non_field_errors": ["User must be authenticated to book an appointment."]}
+            ).send(403)
+
         serializer = AppointmentSerializer(data=data, context={'request': request})
-        
-        # Validate the serializer
+
         if not serializer.is_valid():
             return PrepareResponse(
                 success=False,
                 data=serializer.errors,
                 message="Appointment booking failed"
             ).send(400)
-        
-        # Retrieve necessary data from the serializer
-        saloon_id = serializer.validated_data['saloon']
-        service_variations = serializer.validated_data.get('service_variation')
-        staff_id = serializer.validated_data.get('staff')
-        service_id = serializer.validated_data.get('service')
-        slot_id = serializer.validated_data.get('appointment_slot')  # Extract slot_id here
 
-        # Ensure slot_id is not None and slot exists
+        validated_data = serializer.validated_data
+
+        saloon_id = validated_data['saloon']
+        service_variations_ids = validated_data['service_variation']
+        staff_id = validated_data['staff']
+        service_id = validated_data['service']
+        slot_id = validated_data['appointment_slot']
+        buffer_time = validated_data.get('buffer_time', timedelta(minutes=10))
+        # Fetch instances
         try:
-            slot = AppointmentSlot.objects.get(id=slot_id, staff=staff_id, is_available=True)
-        except AppointmentSlot.DoesNotExist:
+            saloon = Saloon.objects.get(id=saloon_id)
+            service = Service.objects.get(id=service_id, saloon=saloon)
+            staff = Staff.objects.get(id=staff_id, saloon=saloon)
+            slot = AppointmentSlot.objects.get(id=slot_id, staff=staff, is_available=True)
+        except (Saloon.DoesNotExist, Service.DoesNotExist, Staff.DoesNotExist, AppointmentSlot.DoesNotExist):
             return PrepareResponse(
                 success=False,
-                message="Selected appointment slot does not exist or is not available.",
-                errors={"appointment_slot": ["Invalid or unavailable appointment slot."]}
+                message="Invalid saloon, service, staff, or slot.",
+                errors={"non_field_errors": ["Invalid data provided."]}
+            ).send(400)
+        # Fetch ServiceVariations based on UUIDs
+        print("service_variations_ids 1", service_variations_ids)
+
+
+        # Calculate end time
+        try:
+            end_time = calculate_appointment_end_time(
+                date=validated_data['date'],
+                start_time=validated_data['start_time'],
+                service_variations_ids=service_variations_ids,
+                buffer_time=buffer_time
+            )
+        except ValueError as e:
+            return PrepareResponse(
+                success=False,
+                message=str(e)
             ).send(400)
 
-        # Continue with the rest of your logic
-        saloon = get_object_or_404(Saloon, id=saloon_id)
-        total_amount = calculate_total_appointment_price(service_variations)
-        payment_method = serializer.validated_data.get('payment_method')
-        
-        # Process the booking
-        status, appointment = self.process_payment(
-            request, payment_method, total_amount, saloon_id, staff_id.id, service_id.id, slot.id  
+        # Create the appointment
+        appointment = Appointment(
+            user=request.user,
+            saloon=saloon,
+            service=service,
+            staff=staff,
+            appointment_slot=slot,
+            date=validated_data['date'],
+            start_time=validated_data['start_time'],
+            end_time=end_time,
+            payment_method=validated_data.get('payment_method')
         )
+        appointment.save()
 
-        if not status:
+        # Process payment
+        total_amount = calculate_total_appointment_price(service_variations_ids)
+        payment_method = validated_data.get('payment_method')
+        status, appointment_or_error = self.process_payment(
+            request, payment_method, total_amount, saloon.id, staff.id, service.id, slot.id, service_variations_ids
+        )
+        # if not status:
+        #     return PrepareResponse(
+        #         success=False,
+        #         message="Appointment booking failed",
+        #         errors={"non_field_errors": [appointment_or_error]}
+        #     ).send(400)
+
+        # Send confirmation email
+        # send_appointment_confirmation_email.delay(appointment_or_error, serializer, saloon.id, request)
+        if status:
+            return PrepareResponse(
+                success=True,
+                message="Appointment booked successfully",
+                data=serializer.data
+            ).send(200)
+        else:
             return PrepareResponse(
                 success=False,
                 message="Appointment booking failed",
-                errors={"non_field_errors": [appointment]}
+                errors={"non_field_errors": [appointment_or_error]}
             ).send(400)
 
-        # Send confirmation email
-        send_appointment_confirmation_email.delay(appointment, serializer, saloon_id, request)
-
-        return PrepareResponse(
-            success=True,
-            message="Appointment booked successfully",
-            data=serializer.data
-        ).send(200)
-
-    def process_payment(self, request, payment_method, total_amount, saloon_id, staff_id, service_id, slot_id):
+    def process_payment(self, request, payment_method, total_amount, saloon_id, staff_id, service_id, slot_id, service_variation_ids):
         if payment_method == 'coa':
-            return book_appointment(request.user, saloon_id, staff_id, service_id, slot_id)
-        return False, "Invalid payment method"
-
-
+            return book_appointment(request.user, saloon_id, staff_id, service_id, slot_id, service_variation_ids), "Payment processed successfully"
+    
+        return False, "Payment method not supported."
 
 class UserAppointmentsListAPIView(generics.ListAPIView):
     serializer_class = AppointmentSerializer

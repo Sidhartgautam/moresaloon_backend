@@ -34,7 +34,7 @@ class SaloonDetailSerializer(serializers.ModelSerializer):
     reviews = ReviewSerializer(many=True, read_only=True)
     class Meta:
         model = Saloon
-        fields = ['id','name','logo','short_description','long_description','address','banner','email','contact_no','website_link','facebook_link','instagram_link','reviews']
+        fields = ['id','name','logo','short_description','long_description','address','banner','email','contact_no','website_link','facebook_link','instagram_link','reviews','lat','lng']
 
         depth = 1
 
@@ -42,7 +42,7 @@ class SaloonDetailSerializer(serializers.ModelSerializer):
         return obj.logo.url if obj.logo else None 
     
 class AmenitiesSerializer(serializers.ModelSerializer):
-    saloon =serializers.StringRelatedField()
+    saloon =serializers.PrimaryKeyRelatedField(queryset=Saloon.objects.all(),required=True)
     class Meta:
         model = Amenities
         fields = ['id','saloon','name']
