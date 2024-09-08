@@ -6,11 +6,11 @@ from staffs.models import Staff
 from services.models import Service, ServiceVariation
 from saloons.models import Saloon
 from core.utils.response import PrepareResponse
+from datetime import datetime, timedelta
+from uuid import UUID
 
 def calculate_total_appointment_price(service_variations_uuids):
-    """
-    Calculate the total price based on service variations.
-    """
+
     total_price = 0
 
     for variation_uuid in service_variations_uuids:
@@ -25,13 +25,17 @@ def calculate_total_appointment_price(service_variations_uuids):
 
 
 
-def book_appointment(user, saloon_id, staff_id, service_id, slot_id, service_variation_id):
+def book_appointment(user, saloon_id, staff_id, service_id, slot_id, service_variation_ids):
     try:
         # Fetch the saloon, staff, service, and slot
         saloon = Saloon.objects.get(id=saloon_id)
+        print("Appointment - saloon ID:", saloon.id)
         staff = Staff.objects.get(id=staff_id, saloon=saloon)
+        print("Appointment - staff ID:", staff.id)
         service = Service.objects.get(id=service_id, saloon=saloon)
+        print("Appointment - service ID:", service.id)
         slot = AppointmentSlot.objects.get(id=slot_id, staff=staff, is_available=True)
+        print("Appointment - slot ID:", slot.id)
     except (Saloon.DoesNotExist, Staff.DoesNotExist, Service.DoesNotExist, AppointmentSlot.DoesNotExist):
         return PrepareResponse(
             success=False,
@@ -39,19 +43,20 @@ def book_appointment(user, saloon_id, staff_id, service_id, slot_id, service_var
             message="Invalid saloon, staff, service, or slot."
         ).send(400)
 
-    try:
-        service_variation = ServiceVariation.objects.get(id=service_variation_id, service=service)
-    except ServiceVariation.DoesNotExist:
-        return PrepareResponse(
-            success=False,
-            data={},
-            message="Selected service variation is invalid."
-        ).send(400)
+    print("Service Variations:", service_variation_ids)
 
-    service_duration = service_variation.duration 
+    service_variations = ServiceVariation.objects.filter(id__in=service_variation_ids, service=service)
+    if service_variations.count() != len(service_variation_ids):
+        raise ServiceVariation.DoesNotExist("One or more selected service variations are invalid.")
+    for sv in service_variations:
+        print("Service Variation:", sv.id)
+
+    total_duration = timedelta()
+    for variation in service_variations:
+        total_duration += variation.duration
 
     appointment_start_time = datetime.combine(slot.date, slot.start_time)
-    appointment_end_time = appointment_start_time + service_duration
+    appointment_end_time = appointment_start_time + total_duration
 
     slot_end_datetime = datetime.combine(slot.date, slot.end_time)
     if appointment_end_time > slot_end_datetime:
@@ -83,12 +88,32 @@ def book_appointment(user, saloon_id, staff_id, service_id, slot_id, service_var
             end_time=appointment_end_time.time(),
             appointment_slot=slot
         )
+        appointment.service_variation.set(service_variations)
 
         slot.is_available = False
         slot.save()
 
-    return PrepareResponse(
-        success=True,
-        data={'appointment_id': appointment.id},
-        message="Appointment booked successfully."
-    ).send(200)
+    return True
+
+def calculate_appointment_end_time(date, start_time, service_variations_ids, buffer_time=timedelta(minutes=10)):
+    total_duration = timedelta()
+    print("Appointment-Service Variations:", service_variations_ids)
+
+    if not service_variations_ids:
+        raise ValueError("Service variations are required to calculate the appointment duration.")
+    
+    service_variations = ServiceVariation.objects.filter(id__in=service_variations_ids)
+    for variation in service_variations:
+        if hasattr(variation, 'duration'):
+            duration = variation.duration
+            if not isinstance(duration, timedelta):
+                raise ValueError(f"Service variation {variation.id} has an invalid duration type: {type(duration)}")
+            total_duration += duration
+        else:
+            raise ValueError(f"Service variation {variation.id} has no duration.")
+    
+    print(f"Total Duration: {total_duration}")
+    start_datetime = datetime.combine(date, start_time)
+    end_datetime = start_datetime + total_duration + buffer_time
+    return end_datetime.time()
+ 

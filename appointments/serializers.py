@@ -5,7 +5,7 @@ from staffs.models import Staff
 from services.models import Service, ServiceVariation
 from .models import AppointmentSlot, Appointment
 from staffs.models import WorkingDay, BreakTime
-from core.utils.appointment import calculate_total_appointment_price
+from core.utils.appointment import calculate_total_appointment_price,calculate_appointment_end_time
 
 class AppointmentSlotSerializer(serializers.ModelSerializer):
     end_time = serializers.TimeField(read_only=True)
@@ -97,7 +97,7 @@ class AppointmentSlotSerializer(serializers.ModelSerializer):
 
 class AppointmentSerializer(serializers.ModelSerializer):
     service = serializers.UUIDField()
-    service_variation = serializers.ListField(child=serializers.UUIDField(), required=True)
+    service_variation = serializers.ListField(required=True)
     end_time = serializers.TimeField(read_only=True)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     buffer_time = serializers.DurationField(default=timedelta(minutes=10))
@@ -124,6 +124,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'appointment_slot',
         ]
 
+     
+
     def validate(self, data):
         staff_id = data['staff']
         date = data['date']
@@ -131,11 +133,12 @@ class AppointmentSerializer(serializers.ModelSerializer):
         service_id = data['service']
         service_variations_ids = data.get('service_variation', [])
         buffer_time = data.get('buffer_time', timedelta(minutes=10))
+        print("service_variations_ids 1", service_variations_ids)
 
         if date and date < datetime.now().date():
             raise serializers.ValidationError("The date cannot be in the past.")
 
-    # Fetch Staff and Service using IDs
+        # # Fetch Staff and Service using IDs
         try:
             staff = Staff.objects.get(id=staff_id)
         except Staff.DoesNotExist:
@@ -155,22 +158,21 @@ class AppointmentSerializer(serializers.ModelSerializer):
         if not working_day:
             raise serializers.ValidationError(f"Staff is not working on {date.strftime('%A')}.")
 
-        # Calculate the total duration based on service variations
+        # Fetch the service variations and calculate total duration
+        service_variations = []
         total_duration = timedelta()
+        
         for variation_id in service_variations_ids:
             try:
                 variation = ServiceVariation.objects.get(id=variation_id, service=service)
-                total_duration += variation.duration
+                service_variations.append(variation.id)
             except ServiceVariation.DoesNotExist:
                 raise serializers.ValidationError(f"Service variation with ID {variation_id} does not exist or is not valid for the selected service.")
 
-        # Calculate the end time
-        
-        start_datetime = datetime.combine(date, start_time)
-        end_datetime = start_datetime + total_duration + buffer_time
-        end_time = end_datetime.time()
+        # Calculate the end time using the utility function
+        end_time = calculate_appointment_end_time(date, start_time, service_variations, buffer_time)
         data['end_time'] = end_time
-        print(f"Calculated End Time: {end_datetime.time()}")
+        print(f"Calculated End Time: {end_time}")
 
         # Ensure the appointment falls within staff's working hours
         if not (working_day.start_time <= start_time and end_time <= working_day.end_time):
@@ -178,14 +180,14 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
         # Check for overlaps with staff's break times
         for break_time in working_day.break_times.all():
-            if break_time.break_start < end_datetime.time() and start_time < break_time.break_end:
+            if break_time.break_start < end_time and start_time < break_time.break_end:
                 raise serializers.ValidationError("Appointment time overlaps with staff break time.")
 
         # Check for overlapping appointments with the same staff
         overlapping_appointments = Appointment.objects.filter(
             staff=staff,
             date=date,
-            start_time__lt=end_datetime.time(),
+            start_time__lt=end_time,
             end_time__gt=start_time
         ).exists()
 
@@ -194,75 +196,6 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
         return data
 
-    def create(self, validated_data):
-        service = validated_data.pop('service')
-        service_variations_uuids = validated_data.pop('service_variation', [])
-
-        # Fetch the Saloon instance using UUID
-        saloon_id = validated_data.pop('saloon')
-        try:
-            saloon = Saloon.objects.get(id=saloon_id)
-        except Saloon.DoesNotExist:
-            raise serializers.ValidationError(f"Saloon with UUID {saloon_id} does not exist.")
-
-        # Calculate total price based on service variations
-        total_price = calculate_total_appointment_price(service_variations_uuids)
-        validated_data['total_price'] = total_price
-        validated_data['saloon'] = saloon
-        print("Validated Data:", validated_data)
-
-        appointment = Appointment.objects.create(**validated_data)
-        appointment.service = service
-        # Set service variations based on UUIDs
-        variations = ServiceVariation.objects.filter(id__in=service_variations_uuids)
-        appointment.service_variation.set(variations)
-
-        # Calculate the total duration based on service variations
-        total_duration = timedelta()
-        for variation in variations:
-            total_duration += variation.duration
-
-        # Calculate end time
-        start_datetime = datetime.combine(appointment.date, appointment.start_time)
-        end_datetime = start_datetime + total_duration + appointment.buffer_time
-        appointment.end_time = end_datetime.time()
-        print(f"Calculated End Time in Create: {end_datetime.time()}")
-
-
-        appointment.save()
-        
-        return appointment
-
-    def update(self, instance, validated_data):
-        service_variations = validated_data.pop('service_variation', [])
-        services = validated_data.pop('service', [])
-
-        # Update the instance with new data
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-
-        if services:
-            instance.service.set(services)
-        if service_variations:
-            instance.service_variation.set(service_variations)
-
-        # Calculate total price based on updated service variations
-        total_price = calculate_total_appointment_price([variation.id for variation in service_variations])
-        instance.total_price = total_price
-
-        # Calculate total duration considering services from different staff members
-        total_duration = timedelta()
-        for service_variation in service_variations:
-            total_duration += service_variation.duration
-
-        # Update the end_time based on the total duration and buffer_time
-        start_datetime = datetime.combine(instance.date, instance.start_time)
-        end_datetime = start_datetime + total_duration + instance.buffer_time
-        instance.end_time = end_datetime.time()
-        
-        instance.save()
-        print(instance.end_time)
-        return instance
     
 
 class AvailableSlotSerializer(serializers.ModelSerializer):
