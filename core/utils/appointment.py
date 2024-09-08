@@ -25,17 +25,13 @@ def calculate_total_appointment_price(service_variations_uuids):
 
 
 
-def book_appointment(user, saloon_id, staff_id, service_id, slot_id, service_variation_ids):
+def book_appointment(user, saloon_id, staff_id, service_id, slot_id, service_variation_ids,total_price):
     try:
         # Fetch the saloon, staff, service, and slot
         saloon = Saloon.objects.get(id=saloon_id)
-        print("Appointment - saloon ID:", saloon.id)
         staff = Staff.objects.get(id=staff_id, saloon=saloon)
-        print("Appointment - staff ID:", staff.id)
         service = Service.objects.get(id=service_id, saloon=saloon)
-        print("Appointment - service ID:", service.id)
         slot = AppointmentSlot.objects.get(id=slot_id, staff=staff, is_available=True)
-        print("Appointment - slot ID:", slot.id)
     except (Saloon.DoesNotExist, Staff.DoesNotExist, Service.DoesNotExist, AppointmentSlot.DoesNotExist):
         return PrepareResponse(
             success=False,
@@ -43,13 +39,12 @@ def book_appointment(user, saloon_id, staff_id, service_id, slot_id, service_var
             message="Invalid saloon, staff, service, or slot."
         ).send(400)
 
-    print("Service Variations:", service_variation_ids)
-
     service_variations = ServiceVariation.objects.filter(id__in=service_variation_ids, service=service)
     if service_variations.count() != len(service_variation_ids):
         raise ServiceVariation.DoesNotExist("One or more selected service variations are invalid.")
     for sv in service_variations:
         print("Service Variation:", sv.id)
+    
 
     total_duration = timedelta()
     for variation in service_variations:
@@ -78,27 +73,14 @@ def book_appointment(user, saloon_id, staff_id, service_id, slot_id, service_var
             message="The staff is not available during the selected slot."
         ).send(400)
 
-    with transaction.atomic():
-        appointment = Appointment.objects.create(
-            user=user if user and not user.is_anonymous else None,
-            saloon=saloon,
-            staff=staff,
-            service=service,
-            start_time=appointment_start_time.time(),
-            end_time=appointment_end_time.time(),
-            appointment_slot=slot
-        )
-        appointment.service_variation.set(service_variations)
+    total_price = calculate_total_appointment_price(service_variation_ids)
 
-        slot.is_available = False
-        slot.save()
+
 
     return True
 
 def calculate_appointment_end_time(date, start_time, service_variations_ids, buffer_time=timedelta(minutes=10)):
     total_duration = timedelta()
-    print("Appointment-Service Variations:", service_variations_ids)
-
     if not service_variations_ids:
         raise ValueError("Service variations are required to calculate the appointment duration.")
     
@@ -111,8 +93,6 @@ def calculate_appointment_end_time(date, start_time, service_variations_ids, buf
             total_duration += duration
         else:
             raise ValueError(f"Service variation {variation.id} has no duration.")
-    
-    print(f"Total Duration: {total_duration}")
     start_datetime = datetime.combine(date, start_time)
     end_datetime = start_datetime + total_duration + buffer_time
     return end_datetime.time()

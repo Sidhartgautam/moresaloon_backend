@@ -116,7 +116,6 @@ class AppointmentSerializer(serializers.ModelSerializer):
             'date',
             'start_time',
             'end_time',
-            'status',
             'payment_status',
             'payment_method',
             'total_price',
@@ -133,7 +132,6 @@ class AppointmentSerializer(serializers.ModelSerializer):
         service_id = data['service']
         service_variations_ids = data.get('service_variation', [])
         buffer_time = data.get('buffer_time', timedelta(minutes=10))
-        print("service_variations_ids 1", service_variations_ids)
 
         if date and date < datetime.now().date():
             raise serializers.ValidationError("The date cannot be in the past.")
@@ -172,7 +170,6 @@ class AppointmentSerializer(serializers.ModelSerializer):
         # Calculate the end time using the utility function
         end_time = calculate_appointment_end_time(date, start_time, service_variations, buffer_time)
         data['end_time'] = end_time
-        print(f"Calculated End Time: {end_time}")
 
         # Ensure the appointment falls within staff's working hours
         if not (working_day.start_time <= start_time and end_time <= working_day.end_time):

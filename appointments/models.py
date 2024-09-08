@@ -43,9 +43,6 @@ class AppointmentSlot(models.Model):
     def __str__(self):
         return f"{self.saloon} - {self.staff} - {self.date} {self.start_time} - {self.end_time}"
     def clean(self):
-        """
-        Custom validation to check for overlapping appointment slots and ensure valid end time.
-        """
         if self.start_time and self.end_time:
             if self.end_time <= self.start_time:
                 raise ValidationError("End time must be after start time.")
