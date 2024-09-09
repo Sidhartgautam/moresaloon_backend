@@ -19,13 +19,12 @@ class AppointmentSlotSerializer(serializers.ModelSerializer):
         return obj.service_variation.price
    
     def validate(self, data):
-        # Extract the relevant fields
         staff = data.get('staff')
         date = data.get('date')
         start_time = data.get('start_time')
         service = data.get('service')
         service_variation = data.get('service_variation')
-        buffer_time = data.get('buffer_time', timedelta(minutes=10))  # Default to 10 minutes if not provided
+        buffer_time = data.get('buffer_time', timedelta(minutes=10)) 
 
         # Ensure that date is not in the past
         if date and date < datetime.now().date():
@@ -95,48 +94,45 @@ class AppointmentSlotSerializer(serializers.ModelSerializer):
         return data
 
 
-class AppointmentSerializer(serializers.ModelSerializer):
-    service = serializers.UUIDField()
-    service_variation = serializers.ListField(required=True)
+class AppointmentPlaceSerializer(serializers.ModelSerializer):
+    service_id = serializers.UUIDField()
+    service_variation_ids = serializers.ListField(required=True)
     end_time = serializers.TimeField(read_only=True)
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     buffer_time = serializers.DurationField(default=timedelta(minutes=10))
-    staff = serializers.IntegerField()  # Use IntegerField for staff ID
-    appointment_slot = serializers.UUIDField(required=True)
-    saloon = serializers.UUIDField()
+    staff_id = serializers.IntegerField() 
+    appointment_slot_id = serializers.UUIDField(required=True)
+    saloon_id = serializers.UUIDField()
 
     class Meta:
         model = Appointment
         fields = [
             'user',
-            'saloon',
-            'service',
-            'service_variation',
-            'staff',
+            'saloon_id',
+            'service_id',
+            'service_variation_ids',
+            'staff_id',
             'date',
-            'start_time',
             'end_time',
             'payment_status',
             'payment_method',
             'total_price',
             'buffer_time',
-            'appointment_slot',
+            'appointment_slot_id',
         ]
 
-     
-
     def validate(self, data):
-        staff_id = data['staff']
+        staff_id = data['staff_id']
         date = data['date']
-        start_time = data['start_time']
-        service_id = data['service']
-        service_variations_ids = data.get('service_variation', [])
+        service_id = data['service_id']
+        service_variations_ids = data.get('service_variation_ids', [])
         buffer_time = data.get('buffer_time', timedelta(minutes=10))
+        slot_id = data.get('appointment_slot_id')
 
         if date and date < datetime.now().date():
             raise serializers.ValidationError("The date cannot be in the past.")
 
-        # # Fetch Staff and Service using IDs
+        # Fetch Staff and Service using IDs
         try:
             staff = Staff.objects.get(id=staff_id)
         except Staff.DoesNotExist:
@@ -156,10 +152,17 @@ class AppointmentSerializer(serializers.ModelSerializer):
         if not working_day:
             raise serializers.ValidationError(f"Staff is not working on {date.strftime('%A')}.")
 
+        # Fetch the appointment slot and use its start_time
+        try:
+            slot = AppointmentSlot.objects.get(id=slot_id, staff=staff, is_available=True)
+            start_time = slot.start_time  # Use the slot's start_time
+        except AppointmentSlot.DoesNotExist:
+            raise serializers.ValidationError("Invalid or unavailable appointment slot.")
+
         # Fetch the service variations and calculate total duration
         service_variations = []
         total_duration = timedelta()
-        
+
         for variation_id in service_variations_ids:
             try:
                 variation = ServiceVariation.objects.get(id=variation_id, service=service)
@@ -192,7 +195,6 @@ class AppointmentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("This staff member already has an appointment at this time.")
 
         return data
-
     
 
 class AvailableSlotSerializer(serializers.ModelSerializer):
@@ -203,5 +205,21 @@ class AvailableSlotSerializer(serializers.ModelSerializer):
     class Meta:
         model = AppointmentSlot
         fields = ['start_time', 'saloon', 'staff', 'service', 'is_available']
+
+
+class AppointmentListSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField()
+    saloon = serializers.StringRelatedField()
+    service = serializers.StringRelatedField()
+    staff = serializers.StringRelatedField()
+    service_variation = serializers.StringRelatedField(many=True)
+    appointment_slot = serializers.StringRelatedField()
+    total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    payment_status = serializers.CharField(read_only=True)
+    payment_method = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = Appointment
+        fields = ['user', 'saloon', 'service', 'staff', 'service_variation', 'date', 'start_time', 'end_time', 'appointment_slot','total_price', 'payment_status', 'payment_method']
 
 

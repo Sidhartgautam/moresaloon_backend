@@ -7,11 +7,13 @@ from .views import(
        AppointmentSlotCreateAPIView,
        AppointmentSlotDetailAPIView,
        StaffAppointmentsListAPIView,
-       CreatedAvailableSlotListAPIView
+       CreatedAvailableSlotListAPIView,
+       AppointmentListAPIView
 )
 
 urlpatterns = [
     path('place/', BookAppointmentAPIView.as_view(), name='place_appointment'),
+    path('list/', AppointmentListAPIView.as_view(), name='appointment_list'),
     path('user/', UserAppointmentsListAPIView.as_view(), name='user_appointments'),
     path('<int:appointment_id>/', AppointmentDetailAPIView.as_view(), name='appointment_detail'),
     path('appointment-slots/<uuid:saloon_id>/', AppointmentSlotListAPIView.as_view(), name='appointment-slot-list'),

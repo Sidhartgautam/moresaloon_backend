@@ -45,13 +45,6 @@ def search(query=None, category=None, price_min=None, price_max=None, popular_sa
     if price_max:
         service_variation_results = service_variation_results.filter(price__lte=price_max)
 
-    # Filter Service by category
-    if category:
-        service_results = service_results.filter(
-            Q(name__icontains=category) |
-            Q(description__icontains=category)
-        )
-
     # Popular Saloon filtering
     if popular_saloons:
         if popular_saloons == 'popular':
