@@ -12,4 +12,5 @@ urlpatterns = [
     path('newsletter/', include('newsletter.urls')),
     path('offers/', include('offers.urls')),
     path ('openinghours/', include('openinghours.urls')),
+    path('payments/', include('payments.urls')),
 ]

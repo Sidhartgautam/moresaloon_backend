@@ -47,8 +47,7 @@ class BookAppointmentAPIView(APIView):
         date = validated_data['date']
         buffer_time = validated_data.get('buffer_time', timedelta(minutes=10))
         payment_method = validated_data.get('payment_method')
-
-        # Fetch instances
+        payment_method_id = validated_data.get('payment_method_id')
         try:
             saloon = Saloon.objects.get(id=saloon_id)
             service = Service.objects.get(id=service_id, saloon=saloon)
@@ -85,7 +84,8 @@ class BookAppointmentAPIView(APIView):
             payment_status = self.process_payment(
                 payment_method=payment_method,
                 amount=total_price,
-                user=request.user if request.user.is_authenticated else None  # User is optional for COA
+                payment_method_id=payment_method_id,
+                user=request.user if request.user.is_authenticated else None 
             )
         except ValidationError as e:
             return PrepareResponse(
@@ -118,10 +118,36 @@ class BookAppointmentAPIView(APIView):
             data=serializer.data
         ).send(200)
     
-    def process_payment(self, payment_method, amount, user):
+    def process_payment(self, payment_method, amount, user, payment_method_id):
         if payment_method == 'coa':
             return 'Unpaid'
-        return 'Paid'
+        elif payment_method =='stripe':
+            try:
+                return self.stripe_payment(amount, user, payment_method_id)
+            except stripe.error.CardError as e:
+                raise ValidationError(str(e))
+
+    def stripe_payment(self, amount, user, payment_method_id):
+        try:
+            # Create a payment intent
+            url = f"{settings.PAYMENT_API_URL}/stripe/create-payment-intent/"
+            response = requests.post(url, json={
+                'currency': 'usd',  # Adjust as needed
+                'payment_method': payment_method_id,
+                'price': amount
+            })
+            response_data = response.json()
+
+            if response.get('error'):
+                raise ValueError(response_data.get('error', 'Payment failed'))
+
+            return 'Paid'
+
+        except requests.RequestException as e:
+            raise ValueError(f"Payment request error: {str(e)}")
+
+        except Exception as e:
+            raise ValueError(f"Payment processing error: {str(e)}")
     
     
 class AppointmentListAPIView(generics.GenericAPIView):
