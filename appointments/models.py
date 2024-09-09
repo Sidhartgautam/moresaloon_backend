@@ -86,7 +86,10 @@ class Appointment(models.Model):
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='Unpaid')
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='coa')
     created_at = models.DateTimeField(auto_now_add=True)
-
+    fullname= models.CharField(max_length=100, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True) 
+    phone_number= models.CharField(max_length=20, null=True, blank=True)
+    note =models.CharField(max_length=500, null=True, blank=True)
     def __str__(self):
         return f"{self.appointment_id}-{self.user} - {self.saloon} - {self.service} on {self.date} at {self.start_time}"
 

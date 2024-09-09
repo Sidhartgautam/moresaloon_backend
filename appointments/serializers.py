@@ -103,6 +103,10 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
     staff_id = serializers.IntegerField() 
     appointment_slot_id = serializers.UUIDField(required=True)
     saloon_id = serializers.UUIDField()
+    full_name = serializers.CharField()
+    email = serializers.EmailField()
+    phone_number = serializers.CharField()
+    note = serializers.CharField(required=False)
 
     class Meta:
         model = Appointment
@@ -119,6 +123,10 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
             'total_price',
             'buffer_time',
             'appointment_slot_id',
+            'full_name',
+            'email',
+            'phone_number',
+            'note'
         ]
 
     def validate(self, data):
@@ -204,7 +212,7 @@ class AvailableSlotSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AppointmentSlot
-        fields = ['start_time', 'saloon', 'staff', 'service', 'is_available']
+        fields = ['id','start_time', 'saloon', 'staff', 'service', 'is_available']
 
 
 class AppointmentListSerializer(serializers.ModelSerializer):
