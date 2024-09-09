@@ -111,6 +111,8 @@ class BookAppointmentAPIView(APIView):
         appointment.save()
 
         appointment.service_variation.add(*service_variations_ids)
+        slot.is_available = False
+        slot.save()
 
         return PrepareResponse(
             success=True,
