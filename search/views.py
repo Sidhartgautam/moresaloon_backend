@@ -9,12 +9,11 @@ from staffs.serializers import StaffSerializer
 class SearchView(GenericAPIView):
     def get(self, request, *args, **kwargs):
         query = request.query_params.get('query', None)
-        category = request.query_params.get('category', None)
         price_min = request.query_params.get('price_min', None)
         price_max = request.query_params.get('price_max', None)
         popular_saloons = request.query_params.get('popular_saloons', None)
 
-        results = search(query, category, price_min, price_max, popular_saloons)
+        results = search(query, price_min, price_max, popular_saloons)
         
         saloon_serializer = SaloonSerializer(results['saloons'], many=True)
         service_serializer = ServiceSerializer(results['services'], many=True)

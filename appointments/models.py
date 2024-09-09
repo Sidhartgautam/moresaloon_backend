@@ -71,7 +71,7 @@ class AppointmentSlot(models.Model):
 class Appointment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     appointment_id = models.CharField(max_length=50, null=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE,null=True, blank=True)
     appointment_slot = models.ForeignKey(AppointmentSlot, on_delete=models.CASCADE, null=True)
