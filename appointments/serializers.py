@@ -103,6 +103,10 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
     staff_id = serializers.IntegerField() 
     appointment_slot_id = serializers.UUIDField(required=True)
     saloon_id = serializers.UUIDField()
+    fullname = serializers.CharField()
+    email = serializers.EmailField()
+    phone_number = serializers.CharField()
+    note = serializers.CharField(required=False)
 
     class Meta:
         model = Appointment
@@ -119,6 +123,10 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
             'total_price',
             'buffer_time',
             'appointment_slot_id',
+            'fullname',
+            'email',
+            'phone_number',
+            'note'
         ]
 
     def validate(self, data):
@@ -204,7 +212,7 @@ class AvailableSlotSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AppointmentSlot
-        fields = ['start_time', 'saloon', 'staff', 'service', 'is_available']
+        fields = ['id','start_time', 'saloon', 'staff', 'service', 'is_available']
 
 
 class AppointmentListSerializer(serializers.ModelSerializer):
@@ -217,9 +225,13 @@ class AppointmentListSerializer(serializers.ModelSerializer):
     total_price = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     payment_status = serializers.CharField(read_only=True)
     payment_method = serializers.CharField(read_only=True)
+    fullname = serializers.CharField(read_only=True)
+    email = serializers.EmailField(read_only=True)
+    phone_number = serializers.CharField(read_only=True)
+    note = serializers.CharField(read_only=True)
 
     class Meta:
         model = Appointment
-        fields = ['user', 'saloon', 'service', 'staff', 'service_variation', 'date', 'start_time', 'end_time', 'appointment_slot','total_price', 'payment_status', 'payment_method']
+        fields = ['user', 'saloon', 'service', 'staff', 'service_variation', 'date', 'start_time', 'end_time', 'appointment_slot','total_price', 'payment_status', 'payment_method', 'fullname', 'email', 'phone_number', 'note']
 
 
