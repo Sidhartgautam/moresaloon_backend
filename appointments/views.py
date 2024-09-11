@@ -20,6 +20,7 @@ from saloons.models import Saloon
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.send_mail import send_appointment_confirmation_email
 from core.utils.appointment import calculate_total_appointment_price, book_appointment,calculate_appointment_end_time
+from core.utils.appointmentslot import get_next_occurrence_of_day
 from datetime import datetime,timedelta
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -131,26 +132,26 @@ class BookAppointmentAPIView(APIView):
 
     def stripe_payment(self, amount, user, payment_method_id):
         try:
-            # Create a payment intent
-            url = f"{settings.PAYMENT_API_URL}/stripe/create-payment-intent/"
-            response = requests.post(url, json={
-                'currency': 'usd',  # Adjust as needed
-                'payment_method': payment_method_id,
-                'price': amount
-            })
-            response_data = response.json()
-
-            if response.get('error'):
-                raise ValueError(response_data.get('error', 'Payment failed'))
-
-            return 'Paid'
+            # Send request to the external payment API
+            url = "https://moretrek.com/api/payments/all/stripe/create-payment-intent/"
+            response = requests.post(
+                url,
+                json={
+                    'currency': 'usd',  # Assuming currency is 'usd', update if needed
+                    'payment_method': payment_method_id,
+                    'price': amount
+                },
+                headers={'Content-Type': 'application/json'}
+            )
+            if response.status_code == 200:
+                payment_data = response.json()
+                return 'Paid'
+            else:
+                raise ValidationError("Payment failed: {}".format(response.json().get('error', 'Unknown error')))
 
         except requests.RequestException as e:
-            raise ValueError(f"Payment request error: {str(e)}")
-
-        except Exception as e:
-            raise ValueError(f"Payment processing error: {str(e)}")
-    
+            raise ValidationError(f"Payment request error: {str(e)}")
+        
     
 class AppointmentListAPIView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
@@ -376,21 +377,23 @@ class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
         staff_id = self.kwargs.get('staff_id')
         date = self.request.query_params.get('date')
         queryset = AppointmentSlot.objects.filter(
-            staff_id=staff_id, 
-            is_available=True,     
+            staff_id=staff_id
         ).order_by('start_time')
 
+        date_obj = datetime.strptime(date, "%Y-%m-%d").date()
+        day_name = date_obj.strftime("%A")
+
         if date:
-            queryset = queryset.filter(date=date)
+            queryset = queryset.filter(working_day__day_of_week=day_name)
 
         return queryset
 
     def get(self, request, *args, **kwargs):
         date = self.request.query_params.get('date')
-        now_date = datetime.now().date()  # Current date without time
+        now_date = datetime.now().date()
         if date:
             try:
-                query_date = datetime.strptime(date, "%Y-%m-%d").date()  # Convert date from string to date object
+                query_date = datetime.strptime(date, "%Y-%m-%d").date()
             except ValueError:
                 response = PrepareResponse(
                     success=False,

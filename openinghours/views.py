@@ -31,12 +31,18 @@ class OpeningHoursListView(GenericAPIView):
     serializer_class = OpeningHourSerializer
 
     def get_queryset(self):
+        saloon_id = self.kwargs.get('saloon_id')
         country_code = self.request.country_code
+
+        queryset = OpeningHour.objects.all()
+
+        if saloon_id:
+            queryset = queryset.filter(saloon__id=saloon_id)
+
         if country_code:
-            queryset = OpeningHour.objects.filter(saloon__country__code=country_code).order_by('?')[:4]
-        else:
-            queryset = OpeningHour.objects.all().order_by('?')[:4]
-        return queryset
+            queryset = queryset.filter(saloon__country__code=country_code)
+
+        return queryset.order_by('?')[:4] 
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()

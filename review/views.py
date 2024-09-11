@@ -30,7 +30,7 @@ class ReviewListCreateView(generics.GenericAPIView):
     def post(self, request, *args, **kwargs):
         saloon_id = self.kwargs['saloon_id']
         saloon = Saloon.objects.get(id=saloon_id)
-        if Review.objects.filter(saloon=saloon, user=self.request.user).exists():
+        if Review.objects.filter(saloon=saloon, user=request.user if request.user.is_authenticated else None).exists():
             raise ValidationError("You have already reviewed this saloon.")
         
         serializer = self.get_serializer(data=request.data)
@@ -67,7 +67,7 @@ class ReviewRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
         saloon_id = self.kwargs['saloon_id']
         saloon = Saloon.objects.get(id=saloon_id)
         
-        if Review.objects.filter(saloon=saloon, user=self.request.user).exists():
+        if Review.objects.filter(saloon=saloon, user=request.user if request.user.is_authenticated else None).exists():
             raise ValidationError("You have already reviewed this saloon.")
         
         serializer = self.get_serializer(data=request.data)

@@ -94,6 +94,7 @@ class AppointmentSlotSerializer(serializers.ModelSerializer):
         return data
 
 
+
 class AppointmentPlaceSerializer(serializers.ModelSerializer):
     service_id = serializers.UUIDField()
     service_variation_ids = serializers.ListField(required=True)
@@ -106,7 +107,7 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
     fullname = serializers.CharField()
     email = serializers.EmailField()
     phone_number = serializers.CharField()
-    note = serializers.CharField(required=False)
+    note = serializers.CharField(allow_blank=True, allow_null=True)
 
     class Meta:
         model = Appointment
@@ -228,7 +229,7 @@ class AppointmentListSerializer(serializers.ModelSerializer):
     fullname = serializers.CharField(read_only=True)
     email = serializers.EmailField(read_only=True)
     phone_number = serializers.CharField(read_only=True)
-    note = serializers.CharField(read_only=True)
+    note = serializers.CharField(allow_null=True)
 
     class Meta:
         model = Appointment

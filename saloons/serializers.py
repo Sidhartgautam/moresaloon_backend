@@ -18,7 +18,7 @@ class GallerySerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     class Meta:
         model = Gallery
-        fields = ('image',)
+        fields = ['id','image']
     def get_image(self, obj):
         return obj.image.url
 
