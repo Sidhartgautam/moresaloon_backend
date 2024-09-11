@@ -36,6 +36,7 @@ def search(query=None, category=None, price_min=None, price_max=None, popular_sa
         staff_results = staff_results.filter(
             Q(name__icontains=query) |
             Q(description__icontains=query)  # Assuming staff model has a description field
+
         )
 
     # Filter ServiceVariation by price range
