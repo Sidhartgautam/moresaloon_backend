@@ -2,7 +2,7 @@ from rest_framework import generics
 from saloons.models import Saloon
 from rest_framework.permissions import IsAuthenticated
 from .models import Service,ServiceVariation,ServiceImage
-from .serializers import  ServiceSerializer, ServiceImageSerializer, ServiceVariationSerializer, NestedServiceSerializer
+from .serializers import  ServiceSerializer, ServiceImageSerializer, ServiceVariationSerializer, NestedServiceSerializer,AllServiceSerializer
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.response import PrepareResponse
 
@@ -189,11 +189,10 @@ class NestedServiceListView(generics.GenericAPIView):
         return response.send(code=200)
 
 class AllServiceListView(generics.GenericAPIView):
-    serializer_class = ServiceSerializer
+    serializer_class = AllServiceSerializer
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
-        # Simply return all services without filtering by saloon_id
         return Service.objects.all()
 
     def get(self, request, *args, **kwargs):
