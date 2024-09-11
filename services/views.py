@@ -2,7 +2,7 @@ from rest_framework import generics
 from saloons.models import Saloon
 from rest_framework.permissions import IsAuthenticated
 from .models import Service,ServiceVariation,ServiceImage
-from .serializers import  ServiceSerializer, ServiceImageSerializer, ServiceVariationSerializer, NestedServiceSerializer
+from .serializers import  ServiceSerializer, ServiceImageSerializer, ServiceVariationSerializer, NestedServiceSerializer,AllServiceSerializer
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.response import PrepareResponse
 
@@ -185,5 +185,29 @@ class NestedServiceListView(generics.GenericAPIView):
             success=True,
             data=serializer.data,
             message="Services fetched successfully"
+        )
+        return response.send(code=200)
+
+class AllServiceListView(generics.GenericAPIView):
+    serializer_class = AllServiceSerializer
+    pagination_class = CustomPageNumberPagination
+
+    def get_queryset(self):
+        return Service.objects.all()
+
+    def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        paginator = self.pagination_class()
+        queryset = paginator.paginate_queryset(queryset, request)
+        serializer = self.get_serializer(queryset, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+        result = paginated_data['results']
+        del paginated_data['results']
+
+        response = PrepareResponse(
+            success=True,
+            data=result,
+            message="All services fetched successfully",
+            meta=paginated_data
         )
         return response.send(code=200)

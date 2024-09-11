@@ -7,6 +7,8 @@ from .serializers import SaloonSerializer, GallerySerializer,PopularSaloonSerial
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.response import PrepareResponse
 from django.db.models import Count
+from datetime import timedelta
+from django.utils.timezone import now
 
 class SaloonCreateView(generics.GenericAPIView):
     serializer_class = SaloonSerializer
@@ -165,18 +167,42 @@ class PopularSaloonListView(generics.GenericAPIView):
     serializer_class = PopularSaloonSerializer
     pagination_class = CustomPageNumberPagination
 
+    def get_queryset(self):
+        # Get the filter from the query params (e.g., 'all', 'week', 'month', 'year')
+        filter_by = self.request.query_params.get('filter', 'all').lower()
+        
+        # Default queryset - All time
+        queryset = Saloon.objects.annotate(review_count=Count('reviews')).order_by('-review_count')
+        
+        # Filter by time ranges
+        today = now().date()
+        
+        if filter_by == 'week':
+            start_date = today - timedelta(days=7)
+            queryset = queryset.filter(reviews__created_at__gte=start_date)
+        
+        elif filter_by == 'month':
+            queryset = queryset.filter(reviews__created_at__year=today.year, reviews__created_at__month=today.month)
+        
+        elif filter_by == 'year':
+            queryset = queryset.filter(reviews__created_at__year=today.year)
+        
+        return queryset
+
     def get(self, request, *args, **kwargs):
-        saloons = Saloon.objects.annotate(review_count=Count('reviews')).order_by('-review_count')[:4]
+        queryset = self.get_queryset()
         paginator = self.pagination_class()
-        queryset = paginator.paginate_queryset(saloons, request)
+        queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.serializer_class(queryset, many=True)
         paginated_data = paginator.get_paginated_response(serializer.data)
         result = paginated_data['results']
         del paginated_data['results']
+        
         response = PrepareResponse(
             success=True, 
             message="Popular saloons fetched successfully", 
-            data=result, meta=paginated_data,
+            data=result, 
+            meta=paginated_data,
         )
         return response.send(code=200)
     

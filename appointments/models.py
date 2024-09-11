@@ -2,7 +2,7 @@ from django.db import models
 from saloons.models import Saloon
 from services.models import Service
 from users.models import User
-from staffs.models import Staff
+from staffs.models import Staff, WorkingDay
 import uuid
 from django.core.exceptions import ValidationError
 from datetime import datetime, timedelta
@@ -33,10 +33,10 @@ class AppointmentSlot(models.Model):
     saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE)
     staff = models.ForeignKey(Staff, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE,null=True, blank=True)
+    working_day = models.ForeignKey(WorkingDay, on_delete=models.CASCADE,null=True, blank=True)
     service_variation = models.ForeignKey('services.ServiceVariation', on_delete=models.CASCADE,null=True, blank=True)
-    date = models.DateField()
     start_time = models.TimeField()
-    end_time = models.TimeField()
+    end_time = models.TimeField(null=True)
     buffer_time = models.DurationField(default=timedelta(minutes=10),null=True, blank=True)
     is_available = models.BooleanField(default=True)
 

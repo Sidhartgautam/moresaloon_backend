@@ -12,8 +12,18 @@ class SearchView(GenericAPIView):
         price_min = request.query_params.get('price_min', None)
         price_max = request.query_params.get('price_max', None)
         popular_saloons = request.query_params.get('popular_saloons', None)
-
-        results = search(query, price_min, price_max, popular_saloons)
+        location = request.query_params.get('location', None) 
+        country_id = request.query_params.get('country_id', None)
+        
+        # Pass the new parameters to the search function
+        results = search(
+            query=query, 
+            price_min=price_min, 
+            price_max=price_max, 
+            popular_saloons=popular_saloons,
+            location=location,
+            country_id=country_id
+        )
         
         saloon_serializer = SaloonSerializer(results['saloons'], many=True)
         service_serializer = ServiceSerializer(results['services'], many=True)

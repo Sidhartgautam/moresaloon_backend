@@ -4,6 +4,8 @@ from django.conf import settings
 from django.http import JsonResponse
 from rest_framework import generics
 from core.utils.appointment import calculate_total_appointment_price
+import requests
+
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -36,20 +38,31 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 class CreatePaymentIntentView(generics.GenericAPIView):
     def post(self, request, *args, **kwargs):
-        data = json.loads(request.body)
-        currency = data.get('currency', 'usd')
-        payment_method = data.get('payment_method')
-        service_variations_uuids = data.get('service_variations_uuids', [])
-        print(service_variations_uuids)
+        try:
+            data = json.loads(request.body)
+            currency = data.get('currency', 'usd')
+            payment_method = data.get('payment_method')
+            service_variations_uuids = data.get('service_variations_uuids', [])
+            
+            total_price = calculate_total_appointment_price(service_variations_uuids)
 
-        total_price = calculate_total_appointment_price(service_variations_uuids)
-
-        payment_intent = stripe.PaymentIntent.create(
-            amount=int(total_price * 100),
-            currency=currency,
-            payment_method=payment_method,
-            confirm=True  
-        )
-        return JsonResponse({
-            'client_secret': payment_intent.client_secret
-        })
+            payment_data = {
+                'currency': currency,
+                'payment_method': payment_method,
+                'price': total_price  
+            }
+            url = "https://moretrek.com/api/payments/all/stripe/create-payment-intent/"
+            response = requests.post(
+                url,
+                json=payment_data, 
+                headers={'Content-Type': 'application/json'}
+            )
+            if response.status_code == 200:
+                payment_response = response.json()
+                return JsonResponse(payment_response)
+            else:
+                return JsonResponse({'error': 'Failed to create payment intent', 'details': response.json()}, status=403)
+        
+        except Exception as e:
+            # Log and return any other errors
+            return JsonResponse({'error': str(e)}, status=500)

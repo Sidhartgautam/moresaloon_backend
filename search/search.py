@@ -3,7 +3,7 @@ from saloons.models import Saloon
 from services.models import Service, ServiceVariation
 from staffs.models import Staff
 
-def search(query=None, category=None, price_min=None, price_max=None, popular_saloons=None):
+def search(query=None, category=None, price_min=None, price_max=None, popular_saloons=None, location=None, country_id=None):
     """
     Search and filter across Saloon, Service, Staff, and ServiceVariation models.
     """
@@ -36,7 +36,23 @@ def search(query=None, category=None, price_min=None, price_max=None, popular_sa
         staff_results = staff_results.filter(
             Q(name__icontains=query) |
             Q(description__icontains=query)  # Assuming staff model has a description field
+
         )
+    if location:
+        saloon_results = saloon_results.filter(
+            Q(address__icontains=location)
+        )
+        service_results = service_results.filter(
+            Q(saloon__address__icontains=location)
+        )
+        staff_results = staff_results.filter(
+            Q(saloon__address__icontains=location)
+        )
+
+    if country_id:
+        saloon_results = saloon_results.filter(country_id=country_id)
+        service_results = service_results.filter(saloon__country_id=country_id)
+        staff_results = staff_results.filter(saloon__country_id=country_id)
 
     # Filter ServiceVariation by price range
     if price_min:
