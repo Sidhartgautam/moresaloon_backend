@@ -11,51 +11,42 @@ class AppointmentSlotSerializer(serializers.ModelSerializer):
     end_time = serializers.TimeField(read_only=True)
     price = serializers.SerializerMethodField()
     buffer_time = serializers.DurationField(default=timedelta(minutes=10))
+    date=serializers.SerializerMethodField()
+
     class Meta:
         model = AppointmentSlot
-        fields = ['id', 'saloon', 'staff', 'date', 'start_time', 'end_time', 'is_available', 'service', 'service_variation', 'buffer_time', 'price']
+        fields = ['id', 'saloon', 'staff','date', 'start_time', 'end_time', 'is_available', 'service', 'service_variation', 'buffer_time', 'price']
 
     def get_price(self, obj):
-        return obj.service_variation.price
-   
+        return obj.service_variation.price if obj.service_variation else 0
+    
+    def get_date(self, obj):
+        return obj.date.strftime("%Y-%m-%d")
+
     def validate(self, data):
         staff = data.get('staff')
-        date = data.get('date')
         start_time = data.get('start_time')
         service = data.get('service')
         service_variation = data.get('service_variation')
-        buffer_time = data.get('buffer_time', timedelta(minutes=10)) 
+        buffer_time = data.get('buffer_time', timedelta(minutes=10))
 
-        # Ensure that date is not in the past
-        if date and date < datetime.now().date():
-            raise serializers.ValidationError("The date cannot be in the past.")
+        if not staff or not start_time or not service_variation:
+            raise serializers.ValidationError("Staff, start time, and service variation are required.")
 
         if not staff.services.filter(id=service.id).exists():
             raise serializers.ValidationError("The selected staff member does not provide this service.")
 
-        # Ensure that staff, date, and start_time are provided
-        if not all([staff, date, start_time,service_variation]):
-            raise serializers.ValidationError("Staff, date, and start time are required.")
-        
-        # Ensure that either service or service_variation is provided
-        if not service and not service_variation:
-            raise serializers.ValidationError("Either service or service variation must be provided.")
-
-        # Calculate end_time based on service or service_variation
+        # Calculate end_time based on service_variation duration
         service_duration = service_variation.duration
-
-        start_datetime = datetime.combine(date, start_time)
-        end_datetime = start_datetime + service_duration
+        start_datetime = datetime.combine(datetime.today(), start_time)  # Use today's date as placeholder
+        end_datetime = start_datetime + service_duration + (buffer_time or timedelta())
         end_time = end_datetime.time()
 
-        # Add buffer_time to end time
-        end_datetime += buffer_time
-        end_time = end_datetime.time()
-        
+        data['end_time'] = end_time
+
         # Check for overlapping appointment slots
         overlapping_slots = AppointmentSlot.objects.filter(
             staff=staff,
-            date=date,
             start_time__lt=end_time,
             end_time__gt=start_time
         ).exclude(pk=self.instance.pk if self.instance else None).exists()
@@ -63,34 +54,19 @@ class AppointmentSlotSerializer(serializers.ModelSerializer):
         if overlapping_slots:
             raise serializers.ValidationError("The selected time slot overlaps with another appointment slot.")
 
-        # Check if this booking pushes into the next available slot
-        next_slot = AppointmentSlot.objects.filter(
-            staff=staff,
-            date=date,
-            start_time__gte=end_time
-        ).exclude(pk=self.instance.pk if self.instance else None).order_by('start_time').first()
-
-        if next_slot and end_time > next_slot.start_time:
-            raise serializers.ValidationError("This booking extends into the next available slot for this staff member.")
-        
-        # Check staff availability on the selected date
-        staff_working_day = WorkingDay.objects.filter(staff=staff, day_of_week=date.strftime('%A')).first()
+        # Check staff availability
+        staff_working_day = WorkingDay.objects.filter(staff=staff, day_of_week=datetime.today().strftime('%A')).first()
         if not staff_working_day:
-            raise serializers.ValidationError("The selected staff member is not available on this day.")
+            raise serializers.ValidationError("The selected staff member is not available today.")
 
-        # Check staff’s working hours
         if start_time < staff_working_day.start_time or end_time > staff_working_day.end_time:
             raise serializers.ValidationError("The appointment time falls outside the staff member's working hours.")
 
-        # Check break times
         staff_breaks = BreakTime.objects.filter(working_day=staff_working_day)
         for break_time in staff_breaks:
             if start_time < break_time.break_end and end_time > break_time.break_start:
                 raise serializers.ValidationError("The appointment overlaps with the staff member's break time.")
 
-        # Set the calculated end_time
-        data['end_time'] = end_time
-        
         return data
 
 
@@ -112,7 +88,6 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
         fields = [
-            'user',
             'saloon_id',
             'service_id',
             'service_variation_ids',
@@ -137,9 +112,12 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
         service_variations_ids = data.get('service_variation_ids', [])
         buffer_time = data.get('buffer_time', timedelta(minutes=10))
         slot_id = data.get('appointment_slot_id')
+    
 
         if date and date < datetime.now().date():
             raise serializers.ValidationError("The date cannot be in the past.")
+        
+        
 
         # Fetch Staff and Service using IDs
         try:
@@ -163,7 +141,7 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
 
         # Fetch the appointment slot and use its start_time
         try:
-            slot = AppointmentSlot.objects.get(id=slot_id, staff=staff, is_available=True)
+            slot = AppointmentSlot.objects.get(id=slot_id, staff=staff)
             start_time = slot.start_time  # Use the slot's start_time
         except AppointmentSlot.DoesNotExist:
             raise serializers.ValidationError("Invalid or unavailable appointment slot.")
@@ -210,10 +188,9 @@ class AvailableSlotSerializer(serializers.ModelSerializer):
     saloon = serializers.StringRelatedField()
     staff = serializers.StringRelatedField()
     service = serializers.StringRelatedField()
-
     class Meta:
         model = AppointmentSlot
-        fields = ['id','start_time', 'saloon', 'staff', 'service', 'is_available']
+        fields = ['id','start_time', 'saloon', 'staff', 'service']
 
 
 class AppointmentListSerializer(serializers.ModelSerializer):
@@ -234,5 +211,25 @@ class AppointmentListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Appointment
         fields = ['user', 'saloon', 'service', 'staff', 'service_variation', 'date', 'start_time', 'end_time', 'appointment_slot','total_price', 'payment_status', 'payment_method', 'fullname', 'email', 'phone_number', 'note']
+
+class UserAppointmentListSerializer(serializers.ModelSerializer):
+    saloon = serializers.StringRelatedField()
+    service_variation = serializers.StringRelatedField(many=True)
+    total_price =serializers.SerializerMethodField()
+    start_time = serializers.SerializerMethodField()
+    end_time = serializers.SerializerMethodField()
+    date=serializers.DateField()
+
+    class Meta:
+        model = Appointment
+        fields =['id','saloon','service_variation','start_time','end_time','date','total_price']
+
+    def get_total_price(self, obj):
+        return obj.total_price
+
+    def get_start_time(self, obj):
+        return obj.start_time
+    def get_end_time(self, obj):
+        return obj.end_time
 
 

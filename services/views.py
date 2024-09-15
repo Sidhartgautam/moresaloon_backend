@@ -193,7 +193,7 @@ class AllServiceListView(generics.GenericAPIView):
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
-        return Service.objects.all()
+        return Service.objects.values('id','name').distinct()
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()

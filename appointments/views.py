@@ -4,18 +4,20 @@ from rest_framework import generics, permissions
 from rest_framework.permissions import IsAuthenticated,IsAdminUser
 from django.shortcuts import get_object_or_404
 from core.utils.response import PrepareResponse
+from django.utils.dateparse import parse_date
+from users.models import User
 from core.utils.moredealstoken import get_moredeals_token
 from django.db import transaction
 import stripe
 from staffs.models import BreakTime
 from datetime import datetime
 from services.models import Service, ServiceVariation
-from staffs.models import Staff
+from staffs.models import Staff, WorkingDay
 from django.conf import settings
 from django.core.mail import send_mail
 from rest_framework.exceptions import ValidationError
 from .models import Appointment, AppointmentSlot
-from .serializers import AppointmentPlaceSerializer, AppointmentSlotSerializer, AvailableSlotSerializer,AppointmentListSerializer
+from .serializers import AppointmentPlaceSerializer, AppointmentSlotSerializer, AvailableSlotSerializer,AppointmentListSerializer,UserAppointmentListSerializer
 from saloons.models import Saloon
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.send_mail import send_appointment_confirmation_email
@@ -39,6 +41,7 @@ class BookAppointmentAPIView(APIView):
             ).send(400)
 
         validated_data = serializer.validated_data
+        print(validated_data)
 
         saloon_id = validated_data['saloon_id']
         service_variations_ids = validated_data['service_variation_ids']
@@ -53,18 +56,17 @@ class BookAppointmentAPIView(APIView):
             saloon = Saloon.objects.get(id=saloon_id)
             service = Service.objects.get(id=service_id, saloon=saloon)
             staff = Staff.objects.get(id=staff_id, saloon=saloon)
-            slot = AppointmentSlot.objects.get(id=slot_id, staff=staff,date=date, is_available=True)
+            slot = AppointmentSlot.objects.get(id=slot_id,
+                                                 staff=staff,
+                                                #  date=date,
+                                                )
         except (Saloon.DoesNotExist, Service.DoesNotExist, Staff.DoesNotExist, AppointmentSlot.DoesNotExist):
             return PrepareResponse(
                 success=False,
                 message="Invalid saloon, service, staff, or slot.",
                 errors={"non_field_errors": ["Invalid data provided."]}
             ).send(400)
-
-        # Use start_time from appointment slot
         start_time = slot.start_time
-        
-        # Calculate end time
         try:
             end_time = calculate_appointment_end_time(
                 date=validated_data['date'],
@@ -77,8 +79,6 @@ class BookAppointmentAPIView(APIView):
                 success=False,
                 message=str(e)
             ).send(400)
-        
-        # Process payment
         total_price = calculate_total_appointment_price(service_variations_ids)
 
         try:
@@ -94,8 +94,7 @@ class BookAppointmentAPIView(APIView):
                 message="Payment failed",
                 errors={"payment_errors": str(e)}
             ).send(400)
-        
-        # Create the appointment
+        print(request.user)
         appointment = Appointment(
             user=request.user if request.user.is_authenticated else None,
             saloon=saloon,
@@ -107,12 +106,16 @@ class BookAppointmentAPIView(APIView):
             end_time=end_time,
             payment_method=payment_method,
             payment_status=payment_status,
-            total_price=total_price
+            total_price=total_price,
+            fullname = validated_data['fullname'],
+            email = validated_data['email'],
+            phone_number = validated_data['phone_number'],
+            note = validated_data['note']
+            
         )
         appointment.save()
 
         appointment.service_variation.add(*service_variations_ids)
-        slot.is_available = False
         slot.save()
 
         return PrepareResponse(
@@ -120,6 +123,7 @@ class BookAppointmentAPIView(APIView):
              message="Appointment booked successfully with payment method: {}".format(payment_method),
             data=serializer.data
         ).send(200)
+    
     
     def process_payment(self, payment_method, amount, user, payment_method_id):
         if payment_method == 'coa':
@@ -157,8 +161,6 @@ class AppointmentListAPIView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         appointments = Appointment.objects.all()
         serializer = AppointmentListSerializer(appointments, many=True)
-        print(appointments)
-        print(serializer.data)
         response = PrepareResponse(
             success=True,
             data=serializer.data,
@@ -168,11 +170,22 @@ class AppointmentListAPIView(generics.GenericAPIView):
 
     
 class UserAppointmentsListAPIView(generics.ListAPIView):
-    serializer_class = AppointmentPlaceSerializer
+    serializer_class = UserAppointmentListSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Appointment.objects.filter(user=self.request.user)
+        user_id=self.request.user if self.request.user.is_authenticated else None
+        queryset = Appointment.objects.filter(user=user_id)
+        date_param = self.request.query_params.get('date', None)
+        if date_param:
+            try:
+                date = parse_date(date_param)
+                if date:
+                    queryset = queryset.filter(date=date)
+            except ValueError:
+                pass  
+        
+        return queryset
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -376,16 +389,18 @@ class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
     def get_queryset(self):
         staff_id = self.kwargs.get('staff_id')
         date = self.request.query_params.get('date')
-        queryset = AppointmentSlot.objects.filter(
-            staff_id=staff_id
-        ).order_by('start_time')
-
-        date_obj = datetime.strptime(date, "%Y-%m-%d").date()
-        day_name = date_obj.strftime("%A")
+        appointment_booked = Appointment.objects.filter(staff_id=staff_id, date=date).values_list('appointment_slot_id', flat=True)
+        queryset = AppointmentSlot.objects.filter(staff_id=staff_id).order_by('start_time').exclude(id__in=appointment_booked)
 
         if date:
-            queryset = queryset.filter(working_day__day_of_week=day_name)
-
+            try:
+                date_obj = datetime.strptime(date, "%Y-%m-%d").date()
+                day_name = date_obj.strftime("%A")
+                queryset = queryset.filter(
+                    working_day__day_of_week=day_name,
+                )
+            except ValueError:
+                queryset = queryset.none()
         return queryset
 
     def get(self, request, *args, **kwargs):
@@ -394,37 +409,31 @@ class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
         if date:
             try:
                 query_date = datetime.strptime(date, "%Y-%m-%d").date()
+                if query_date < now_date:
+                    return PrepareResponse(
+                        success=False,
+                        message="The requested date is in the past.",
+                        data=None
+                    ).send(400)
             except ValueError:
-                response = PrepareResponse(
+                return PrepareResponse(
                     success=False,
-                    message="Invalid date format provided.",
+                    message="Invalid date format provided. Use 'YYYY-MM-DD'.",
                     data=None
-                )
-                return response.send(400)
-
-            if query_date < now_date:
-                response = PrepareResponse(
-                    success=False,
-                    message="The requested date is in the past.",
-                    data=None
-                )
-                return response.send(400)
+                ).send(400)
         queryset = self.get_queryset()
         if not queryset.exists():
-            response = PrepareResponse(
+            return PrepareResponse(
                 success=False,
                 message="No available slots found.",
                 data=None
-            )
-            return response.send(404)
+            ).send(404)
         serializer = self.get_serializer(queryset, many=True)
-        response = PrepareResponse(
+        return PrepareResponse(
             success=True,
-            message="Available slots created by admin fetched successfully",
+            message="Available slots created by admin fetched successfully.",
             data=serializer.data
-        )
-        return response.send(200)
-    
+        ).send(200)
 
 class AppointmentUpdateAPIView(generics.GenericAPIView):
     serializer_class = AppointmentSlotSerializer

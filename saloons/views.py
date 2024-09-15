@@ -6,9 +6,10 @@ from .models import Saloon,Gallery,Amenities
 from .serializers import SaloonSerializer, GallerySerializer,PopularSaloonSerializer,SaloonDetailSerializer,AmenitiesSerializer
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.response import PrepareResponse
-from django.db.models import Count
+from django.db.models import Count, Q
 from datetime import timedelta
 from django.utils.timezone import now
+
 
 class SaloonCreateView(generics.GenericAPIView):
     serializer_class = SaloonSerializer
@@ -165,46 +166,54 @@ class NearestSaloonView(APIView):
 
 class PopularSaloonListView(generics.GenericAPIView):
     serializer_class = PopularSaloonSerializer
-    pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
-        # Get the filter from the query params (e.g., 'all', 'week', 'month', 'year')
         filter_by = self.request.query_params.get('filter', 'all').lower()
-        
-        # Default queryset - All time
-        queryset = Saloon.objects.annotate(review_count=Count('reviews')).order_by('-review_count')
-        
-        # Filter by time ranges
         today = now().date()
-        
+        queryset = Saloon.objects.annotate(appointment_count=Count('appointment'))
+
         if filter_by == 'week':
             start_date = today - timedelta(days=7)
-            queryset = queryset.filter(reviews__created_at__gte=start_date)
-        
+            queryset = queryset.annotate(
+                recent_appointment_count=Count(
+                    'appointment',
+                    filter=Q(appointment__date__gte=start_date)
+                )
+            ).order_by('-recent_appointment_count')
+
         elif filter_by == 'month':
-            queryset = queryset.filter(reviews__created_at__year=today.year, reviews__created_at__month=today.month)
-        
+            queryset = queryset.annotate(
+                recent_appointment_count=Count(
+                    'appointment',
+                    filter=Q(appointment__date__year=today.year, appointment__date__month=today.month)
+                )
+            ).order_by('-recent_appointment_count')
+
         elif filter_by == 'year':
-            queryset = queryset.filter(reviews__created_at__year=today.year)
-        
+            queryset = queryset.annotate(
+                recent_appointment_count=Count(
+                    'appointment',
+                    filter=Q(appointment__date__year=today.year)
+                )
+            ).order_by('-recent_appointment_count')
+
+        else:
+            queryset = queryset.order_by('-appointment_count')
+
         return queryset
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        paginator = self.pagination_class()
-        queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.serializer_class(queryset, many=True)
-        paginated_data = paginator.get_paginated_response(serializer.data)
-        result = paginated_data['results']
-        del paginated_data['results']
-        
         response = PrepareResponse(
-            success=True, 
-            message="Popular saloons fetched successfully", 
-            data=result, 
-            meta=paginated_data,
+            success=True,
+            message="Popular salons fetched successfully",
+            data=serializer.data
         )
         return response.send(code=200)
+
+
+
     
 class AmenitiesListView(generics.GenericAPIView):
     serializer_class = AmenitiesSerializer

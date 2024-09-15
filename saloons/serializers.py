@@ -23,10 +23,10 @@ class GallerySerializer(serializers.ModelSerializer):
         return obj.image.url
 
 class PopularSaloonSerializer(serializers.ModelSerializer):
-    review_count = serializers.IntegerField(read_only=True)
+    appointments_count = serializers.IntegerField(read_only=True)
     class Meta:
         model = Saloon
-        fields = ('id', 'name', 'logo','short_description','address','review_count')
+        fields = ('id', 'name', 'logo','short_description','address','appointments_count')
 
 class SaloonDetailSerializer(serializers.ModelSerializer):
     logo = serializers.ImageField(required=False)

@@ -3,12 +3,11 @@ from .models import Appointment, AppointmentSlot
 from datetime import datetime
 
 class AppointmentAdmin(admin.ModelAdmin):
-    exclude = ('end_time',)  # Exclude end_time from admin form
 
     fields = (
         'user', 'saloon', 'service', 'service_variation', 
         'staff','date',  'start_time', 'status', 
-        'payment_status', 'payment_method', 'total_price'
+        'payment_status', 'payment_method', 'total_price','fullname', 'email', 'phone_number', 'note'
     )
     readonly_fields = ('end_time',)  # Make end_time readonly if you want to display it but not edit
 
@@ -20,7 +19,6 @@ class AppointmentAdmin(admin.ModelAdmin):
             end_datetime = start_datetime + service_duration
             obj.end_time = end_datetime.time()
         else:
-            # Handle cases where service_variation or duration is not available
             obj.end_time = None
 
         super().save_model(request, obj, form, change)
@@ -29,6 +27,8 @@ admin.site.register(Appointment, AppointmentAdmin)
 
 @admin.register(AppointmentSlot)
 class AppointmentSlotAdmin(admin.ModelAdmin):
-    list_display = ['saloon', 'staff', 'service', 'start_time', 'end_time', 'is_available']
+    list_display = ['id', 'saloon', 'staff', 'service', 'start_time', 'end_time','working_day']
     list_filter = ['saloon', 'staff', 'service']
     search_fields = ['saloon__name', 'staff__name', 'service__name']
+
+
