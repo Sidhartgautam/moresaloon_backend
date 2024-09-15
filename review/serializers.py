@@ -26,6 +26,7 @@ class ReviewSerializer(serializers.ModelSerializer):
     def get_saloon_id(self, obj):
         return obj.saloon.id
 
+
     # def get_image(self, obj):
     #     return obj.user.profile_image.url
     

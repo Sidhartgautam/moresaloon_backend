@@ -138,10 +138,11 @@ class BookAppointmentAPIView(APIView):
         try:
             # Send request to the external payment API
             url = "https://moretrek.com/api/payments/all/stripe/create-payment-intent/"
+            
             response = requests.post(
                 url,
                 json={
-                    'currency': 'usd',  # Assuming currency is 'usd', update if needed
+                    'currency': 'usd', 
                     'payment_method': payment_method_id,
                     'price': amount
                 },

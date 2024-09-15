@@ -36,7 +36,7 @@ STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*','192.168.1.77:8000']
+ALLOWED_HOSTS = ['*','192.168.1.80:8000']
 
 
 # Application definition
@@ -169,7 +169,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "http://192.168.1.95:3000",
+    "http://192.168.1.70:3000",
     "https://more-saloon.vercel.app"
 
 
