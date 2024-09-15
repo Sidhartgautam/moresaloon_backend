@@ -36,12 +36,12 @@ class AppointmentSlot(models.Model):
     working_day = models.ForeignKey(WorkingDay, on_delete=models.CASCADE,null=True, blank=True)
     service_variation = models.ForeignKey('services.ServiceVariation', on_delete=models.CASCADE,null=True, blank=True)
     start_time = models.TimeField()
+    # date= models.DateField(null=True)
     end_time = models.TimeField(null=True)
     buffer_time = models.DurationField(default=timedelta(minutes=10),null=True, blank=True)
-    is_available = models.BooleanField(default=True)
 
     def __str__(self):
-        return f"{self.saloon} - {self.staff} - {self.date} {self.start_time} - {self.end_time}"
+        return f"{self.saloon} - {self.staff} -{self.working_day} {self.start_time} - {self.end_time}"
     def clean(self):
         if self.start_time and self.end_time:
             if self.end_time <= self.start_time:
@@ -49,19 +49,21 @@ class AppointmentSlot(models.Model):
             
             overlapping_slots = AppointmentSlot.objects.filter(
                 staff=self.staff,
-                date=self.date,
+                working_day=self.working_day,
                 start_time__lt=self.end_time,
                 end_time__gt=self.start_time
             ).exclude(pk=self.pk)
 
-            if overlapping_slots.exists():
-                raise ValidationError("The selected time slot overlaps with an existing appointment slot for this staff member.")
+
+            if overlapping_slots.filter(working_day=self.working_day).exists():
+             raise ValidationError("The selected time slot overlaps with an existing appointment slot for this staff member.")
+
 
         super().clean()
 
     def save(self, *args, **kwargs):
         if self.start_time and self.service_variation:
-            start_datetime = datetime.combine(self.date, self.start_time)
+            start_datetime = datetime.combine( datetime.today(),self.start_time)
             end_datetime = start_datetime + self.service_variation.duration + (self.buffer_time or timedelta())
             self.end_time = end_datetime.time()
         

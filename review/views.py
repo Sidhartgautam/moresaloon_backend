@@ -7,7 +7,7 @@ from core.utils.response import PrepareResponse
 from core.utils.pagination import CustomPageNumberPagination
 from rest_framework.decorators import permission_classes
 
-class ReviewListCreateView(generics.GenericAPIView):
+class ReviewListView(generics.GenericAPIView):
     serializer_class = ReviewSerializer
     pagination_class = CustomPageNumberPagination
     
@@ -22,9 +22,36 @@ class ReviewListCreateView(generics.GenericAPIView):
         result = paginated_data['results']
         del paginated_data['results']
         response = PrepareResponse(
-            success=True, message="Saloons Reviews List", data=result, meta=paginated_data,
+            success=True,
+            message="Saloons Reviews List",
+            data=result, meta=paginated_data,
         )
         return response.send(code=200)
+
+    
+class UserReviewListView(generics.GenericAPIView):
+    serializer_class = ReviewSerializer
+    pagination_class = CustomPageNumberPagination
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, *args, **kwargs):
+        user_id=request.user if request.user.is_authenticated else None
+        review = Review.objects.filter(user_id=user_id).order_by('-created_at')
+        paginator = self.pagination_class()
+        queryset = paginator.paginate_queryset(review, request)
+        serializer = self.serializer_class(queryset, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+        result = paginated_data['results']
+        del paginated_data['results']
+        response = PrepareResponse(
+            success=True,
+            message="User Reviews List",
+            data=result, meta=paginated_data,
+        )
+        return response.send(code=200)
+
+class ReviewCreateView(generics.CreateAPIView):
+    serializer_class = ReviewSerializer
 
     @permission_classes([permissions.IsAuthenticated])
     def post(self, request, *args, **kwargs):
@@ -48,6 +75,7 @@ class ReviewListCreateView(generics.GenericAPIView):
             message='Error creating review'
         )
         return response.send(400)
+
 
 class ReviewRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ReviewSerializer
