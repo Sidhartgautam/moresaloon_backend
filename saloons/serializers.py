@@ -26,7 +26,7 @@ class PopularSaloonSerializer(serializers.ModelSerializer):
     appointments_count = serializers.IntegerField(read_only=True)
     class Meta:
         model = Saloon
-        fields = ('id', 'name', 'logo','short_description','address','appointments_count')
+        fields = ['id', 'name', 'logo','short_description','address','appointments_count']
 
 class SaloonDetailSerializer(serializers.ModelSerializer):
     logo = serializers.ImageField(required=False)

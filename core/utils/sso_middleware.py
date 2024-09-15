@@ -46,17 +46,6 @@ class SSOAuthentication(JWTAuthentication):
         try:
             user = User.objects.get(Q(email=user_email) | Q(username=username) | Q(phone_number=phone_number))
         except User.DoesNotExist:
-            # restaurant = Restaurant.objects.create(
-            #     name="SOME RANDOM NAME",
-            #     lng=0,
-            #     lat=0,
-            #     address="some random address",
-            #     email="some random email",
-            #     contact_no="some random contact number",
-            #     description="some random description",
-            #     banner="some random banner",
-            #     logo="some random logo"
-            # )
             user = User.objects.create(
                 id=user_id,
                 email=user_email,

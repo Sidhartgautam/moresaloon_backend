@@ -14,7 +14,7 @@ class AppointmentAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         # Calculate end_time based on service_variation duration if available
         if obj.start_time and obj.service_variation.exists():
-            service_duration = sum(v.duration for v in obj.service_variation.all())
+            service_duration = obj.service_variation.first().duration
             start_datetime = datetime.combine(obj.date, obj.start_time)
             end_datetime = start_datetime + service_duration
             obj.end_time = end_datetime.time()
@@ -30,5 +30,7 @@ class AppointmentSlotAdmin(admin.ModelAdmin):
     list_display = ['id', 'saloon', 'staff', 'service', 'start_time', 'end_time','working_day']
     list_filter = ['saloon', 'staff', 'service']
     search_fields = ['saloon__name', 'staff__name', 'service__name']
+
+    # sum(v.duration for v in obj.service_variation.all())
 
 

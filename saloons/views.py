@@ -166,6 +166,7 @@ class NearestSaloonView(APIView):
 
 class PopularSaloonListView(generics.GenericAPIView):
     serializer_class = PopularSaloonSerializer
+    pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
         filter_by = self.request.query_params.get('filter', 'all').lower()
@@ -204,13 +205,22 @@ class PopularSaloonListView(generics.GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
+        paginator = self.pagination_class()
+        queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.serializer_class(queryset, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+
+        result = paginated_data['results']
+        del paginated_data['results']
+
         response = PrepareResponse(
             success=True,
-            message="Popular salons fetched successfully",
-            data=serializer.data
+            message="Saloons fetched successfully",
+            data=result,
+            meta=paginated_data
         )
         return response.send(code=200)
+
 
 
 
