@@ -1,5 +1,5 @@
 from django.db import models
-from services.models import Service
+from services.models import ServiceVariation
 from saloons.models import Saloon
 import uuid
 
@@ -10,7 +10,7 @@ class SaloonOffer(models.Model):
         editable=False
     )
     name = models.CharField(max_length=255)
-    service = models.ManyToManyField(Service)
+    service_variation = models.ManyToManyField(ServiceVariation)
     banner = models.ImageField(upload_to="saloon_offers/", null=True)
     saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)

@@ -79,15 +79,36 @@ def book_appointment(user, saloon_id, staff_id, service_id, slot_id, service_var
 
     return True
 
+# def calculate_appointment_end_time(date, start_time, service_variations_ids, buffer_time=timedelta(minutes=10)):
+#     total_duration = timedelta()
+#     if not service_variations_ids:
+#         raise ValueError("Service variations are required to calculate the appointment duration.")
+    
+#     service_variations = ServiceVariation.objects.filter(id__in=service_variations_ids)
+#     for variation in service_variations:
+#         if hasattr(variation, 'duration'):
+#             duration = variation.duration
+#             if not isinstance(duration, timedelta):
+#                 raise ValueError(f"Service variation {variation.id} has an invalid duration type: {type(duration)}")
+#             total_duration += duration
+#         else:
+#             raise ValueError(f"Service variation {variation.id} has no duration.")
+#     start_datetime = datetime.combine(date, start_time)
+#     end_datetime = start_datetime + total_duration + buffer_time
+#     return end_datetime.time()
+
 def calculate_appointment_end_time(date, start_time, service_variations_ids, buffer_time=timedelta(minutes=10)):
     total_duration = timedelta()
     if not service_variations_ids:
         raise ValueError("Service variations are required to calculate the appointment duration.")
-    
     service_variations = ServiceVariation.objects.filter(id__in=service_variations_ids)
     for variation in service_variations:
         if hasattr(variation, 'duration'):
-            duration = variation.duration
+            if isinstance(variation.duration, str):
+                hours, minutes, seconds = map(int, variation.duration.split(':'))
+                duration = timedelta(hours=hours, minutes=minutes, seconds=seconds)
+            else:
+                duration = variation.duration
             if not isinstance(duration, timedelta):
                 raise ValueError(f"Service variation {variation.id} has an invalid duration type: {type(duration)}")
             total_duration += duration

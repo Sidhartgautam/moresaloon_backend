@@ -212,9 +212,14 @@ class AppointmentListSerializer(serializers.ModelSerializer):
         model = Appointment
         fields = ['user', 'saloon', 'service', 'staff', 'service_variation', 'date', 'start_time', 'end_time', 'appointment_slot','total_price', 'payment_status', 'payment_method', 'fullname', 'email', 'phone_number', 'note']
 
+class AppointmentServiceVariationListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceVariation
+        fields = ['id', 'name', 'duration','price']
+        
 class UserAppointmentListSerializer(serializers.ModelSerializer):
     saloon = serializers.StringRelatedField()
-    service_variation = serializers.StringRelatedField(many=True)
+    service_variation = AppointmentServiceVariationListSerializer(many=True)
     total_price =serializers.SerializerMethodField()
     start_time = serializers.SerializerMethodField()
     end_time = serializers.SerializerMethodField()

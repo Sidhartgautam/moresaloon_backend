@@ -86,7 +86,7 @@ class BookAppointmentAPIView(APIView):
                 payment_method=payment_method,
                 amount=total_price,
                 payment_method_id=payment_method_id,
-                user=request.user if request.user.is_authenticated else None 
+                user=request.user if request.user.is_authenticated else None
             )
         except ValidationError as e:
             return PrepareResponse(
@@ -95,6 +95,7 @@ class BookAppointmentAPIView(APIView):
                 errors={"payment_errors": str(e)}
             ).send(400)
         print(request.user)
+       
         appointment = Appointment(
             user=request.user if request.user.is_authenticated else None,
             saloon=saloon,
