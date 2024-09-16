@@ -1,9 +1,10 @@
 from rest_framework.generics import GenericAPIView
 from rest_framework import generics
-from .serializers import SaloonOfferSerializer
+from .serializers import SaloonOfferSerializer,SaloonOfferListSerializer
 from .models import SaloonOffer
 from django.shortcuts import get_object_or_404
 from core.utils.response import PrepareResponse
+from core.utils.pagination import CustomPageNumberPagination
 
 
 class SaloonOfferCreateView(generics.GenericAPIView):
@@ -30,7 +31,8 @@ class SaloonOfferCreateView(generics.GenericAPIView):
 
 
 class SaloonOfferListView(GenericAPIView):
-    serializer_class = SaloonOfferSerializer
+    serializer_class = SaloonOfferListSerializer
+    pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
         country_code = self.request.country_code
@@ -42,17 +44,25 @@ class SaloonOfferListView(GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
+        paginator = self.pagination_class()
+        queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.get_serializer(queryset, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+        result = paginated_data['results']
+        del paginated_data['results']
         response = PrepareResponse(
             success=True,
-            data=serializer.data,
-            message="Saloon Offers fetched successfully"
+            message="Saloon Offers fetched successfully",
+            data=result,
+            meta=paginated_data
         )
-        return response.send(200)
+        return response.send(code=200)
+    
 
 
 class SaloonSpecificOfferListView(GenericAPIView):
-    serializer_class = SaloonOfferSerializer
+    serializer_class = SaloonOfferListSerializer
+    pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
         saloon_id = self.kwargs['saloon_id']
@@ -65,10 +75,16 @@ class SaloonSpecificOfferListView(GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
+        paginator = self.pagination_class()
+        queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.get_serializer(queryset, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+        result = paginated_data['results']
+        del paginated_data['results']
         response = PrepareResponse(
             success=True,
-            data=serializer.data,
-            message="Saloon Specific Offers fetched successfully"
+            message="Saloon Offers fetched successfully",
+            data=result,
+            meta=paginated_data
         )
-        return response.send(200)
+        return response.send(code=200)
