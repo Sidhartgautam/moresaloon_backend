@@ -122,45 +122,64 @@ class GalleryListView(generics.GenericAPIView):
     
     
 class NearestSaloonView(APIView):
+    serializer_class = SaloonSerializer
+    pagination_class = CustomPageNumberPagination
+
     def get(self, request, *args, **kwargs):
-        lat1 = float(request.query_params.get('latitude'))
-        lon1 = float(request.query_params.get('longitude'))
-        
-        if lat1 == 0 or lon1 == 0:
-            saloons = Saloon.objects.filter(country__code=request.country_code)
-            serializer = SaloonSerializer(saloons, many=True)
+        lat1 = request.query_params.get('latitude')
+        lon1 = request.query_params.get('longitude')
+        if not lat1 or not lon1:
             response = PrepareResponse(
-                success=True,
-                data=serializer.data,
-                message="Nearest Saloons fetched successfully"
+                success=False,
+                data=[],
+                message="Latitude and Longitude not provided",
+                errors={"non_field_errors": ["Latitude and Longitude not provided"]}
             )
-        else:
-            radius = 10  # Radius in km
-            
-            def haversine(lon1, lat1, lon2, lat2):
-                lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-                
-                dlon = lon2 - lon1
-                dlat = lat2 - lat1
-                a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-                c = 2 * asin(sqrt(a))
-                r = 6371  # Radius of earth in km
-                print(f"Distance: {c * r:.2f} km")
-                return c * r
-
-            saloons = Saloon.objects.filter(country__code=request.country_code)
-            nearby_saloons = [
-                saloon for saloon in saloons
-                if haversine(lon1, lat1, saloon.lng, saloon.lat) <= radius
-            ]
-
-            serializer = SaloonSerializer(nearby_saloons, many=True)
+            return response.send(400)
+        try:
+            lat1 = float(lat1)
+            lon1 = float(lon1)
+        except ValueError:
             response = PrepareResponse(
-                success=True,
-                data=serializer.data,
-                message="Nearest Saloons fetched successfully"
+                success=False,
+                data=[],
+                message="Invalid latitude or longitude format",
+                errors={"non_field_errors": ["Invalid latitude or longitude format"]}
             )
+            return response.send(400)
 
+        radius = 10  
+        def haversine(lon1, lat1, lon2, lat2):
+            from math import radians, sin, cos, sqrt, asin
+            lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+            dlon = lon2 - lon1
+            dlat = lat2 - lat1
+            a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+            c = 2 * asin(sqrt(a))
+            r = 6371 
+            return c * r
+
+        saloons = Saloon.objects.filter(country__code=request.country_code)
+        nearby_saloons = [
+            {'saloon': saloon, 'distance': haversine(lon1, lat1, saloon.lng, saloon.lat)}
+            for saloon in saloons
+            if haversine(lon1, lat1, saloon.lng, saloon.lat) <= radius
+        ]
+        nearby_saloons.sort(key=lambda x: x['distance'])
+        sorted_saloons = [entry['saloon'] for entry in nearby_saloons]
+        paginator = self.pagination_class()
+        paginated_queryset = paginator.paginate_queryset(sorted_saloons, request)
+        serializer = self.serializer_class(paginated_queryset, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+
+        result = paginated_data['results']
+        del paginated_data['results'] 
+        response = PrepareResponse(
+            success=True,
+            message="Nearest Saloons fetched successfully",
+            data=result,
+            meta=paginated_data,
+        )
         return response.send(200)
 
 
