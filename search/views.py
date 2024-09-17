@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.generics import GenericAPIView
 from .search import search
 from saloons.serializers import SaloonSerializer
-from services.serializers import ServiceSerializer, ServiceVariationSerializer
+from services.serializers import ServiceSerializer, NestedServiceVariationSerializer
 from staffs.serializers import StaffSerializer
 
 class SearchView(GenericAPIView):
@@ -14,21 +14,29 @@ class SearchView(GenericAPIView):
         popular_saloons = request.query_params.get('popular_saloons', None)
         location = request.query_params.get('location', None) 
         country_id = request.query_params.get('country_id', None)
-        
-        # Pass the new parameters to the search function
+        amenities = request.query_params.get('amenities', None)
+        sort_price = request.query_params.get('sort_price', None)
+        ratings = request.query_params.get('ratings',None)
+
         results = search(
             query=query, 
             price_min=price_min, 
             price_max=price_max, 
             popular_saloons=popular_saloons,
             location=location,
-            country_id=country_id
+            country_id=country_id,
+            amenities = amenities,
+            sort_price = sort_price,
+            ratings= ratings
+
+
         )
         
         saloon_serializer = SaloonSerializer(results['saloons'], many=True)
         service_serializer = ServiceSerializer(results['services'], many=True)
         staff_serializer = StaffSerializer(results['staff'], many=True)
-        service_variation_serializer = ServiceVariationSerializer(results['service_variations'], many=True)
+        service_variation_serializer = NestedServiceVariationSerializer(results['service_variations'], many=True)
+
 
         response_data = {
             'saloons': saloon_serializer.data,

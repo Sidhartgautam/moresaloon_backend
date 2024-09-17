@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Example</title>
+</head>
+<body>
+    <h1>WebSocket Example</h1>
+    <input id="messageInput" type="text" placeholder="Enter your message" />
+    <button onclick="sendMessage()">Send Message</button>
+    <pre id="messages"></pre>
+
+    <script>
+        const socket = new WebSocket('ws://192.168.1.96:8000/ws/ride/');
+
+        socket.onopen = function(event) {
+            console.log('WebSocket is open.');
+        };
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            document.getElementById('messages').textContent += 'Server: ' + data.message + '\n';
+        };
+
+        socket.onclose = function(event) {
+            console.log('WebSocket is closed.');
+        };
+
+        function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value;
+
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    'type': 'echo.message',
+                    'message': message
+                }));
+            } else {
+                console.log('WebSocket is not open. Message queued.');
+            }
+
+            messageInput.value = '';  // Clear input field after sending
+        }
+    </script>
+</body>
+</html>

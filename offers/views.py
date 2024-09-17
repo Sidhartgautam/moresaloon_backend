@@ -1,34 +1,30 @@
 from rest_framework.generics import GenericAPIView
 from rest_framework import generics
-from .serializers import SaloonOfferSerializer,SaloonOfferListSerializer
+from .serializers import SaloonOfferSerializer, SaloonOfferListSerializer
 from .models import SaloonOffer
-from django.shortcuts import get_object_or_404
 from core.utils.response import PrepareResponse
 from core.utils.pagination import CustomPageNumberPagination
-
 
 class SaloonOfferCreateView(generics.GenericAPIView):
     serializer_class = SaloonOfferSerializer
 
-    def post(self,request,*args,**kwargs):
-        serializer =self.get_serializer(data=request.data)
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            response=PrepareResponse(
+            response = PrepareResponse(
                 success=True,
                 data=serializer.data,
                 message="Saloon Offer created successfully"
             )
-            return response.send(201)
+            return response.send(code=201)
 
-        response = PrepareResponse( 
+        response = PrepareResponse(
             success=False,
             data=serializer.errors,
             message="Failed to create saloon offer"
         )
-        return response.send(400)
-
-
+        return response.send(code=400)
 
 class SaloonOfferListView(GenericAPIView):
     serializer_class = SaloonOfferListSerializer
@@ -57,8 +53,6 @@ class SaloonOfferListView(GenericAPIView):
             meta=paginated_data
         )
         return response.send(code=200)
-    
-
 
 class SaloonSpecificOfferListView(GenericAPIView):
     serializer_class = SaloonOfferListSerializer

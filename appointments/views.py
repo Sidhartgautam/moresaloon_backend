@@ -20,7 +20,7 @@ from .models import Appointment, AppointmentSlot
 from .serializers import AppointmentPlaceSerializer, AppointmentSlotSerializer, AvailableSlotSerializer,AppointmentListSerializer,UserAppointmentListSerializer
 from saloons.models import Saloon
 from core.utils.pagination import CustomPageNumberPagination
-from core.utils.send_mail import send_appointment_confirmation_email
+from core.utils.mail import send_confirmation_email
 from core.utils.appointment import calculate_total_appointment_price, book_appointment,calculate_appointment_end_time
 from core.utils.appointmentslot import get_next_occurrence_of_day
 from datetime import datetime,timedelta
@@ -118,6 +118,7 @@ class BookAppointmentAPIView(APIView):
 
         appointment.service_variation.add(*service_variations_ids)
         slot.save()
+        send_confirmation_email(appointment)
 
         return PrepareResponse(
             success=True,

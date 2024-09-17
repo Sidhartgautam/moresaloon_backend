@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Appointment Confirmation</title>
+</head>
+<body>
+    <h2>Appointment Confirmation</h2>
+
+    <p>Dear {{ fullname }},</p>
+
+    <p>Your appointment has been successfully booked! Here are the details:</p>
+
+    <ul>
+        <li><strong>Appointment ID:</strong> {{ appointment_id }}</li>
+        <li><strong>Saloon:</strong> {{ saloon_name }}</li>
+        <li><strong>Service:</strong> {{ service_name }}</li>
+        <li><strong>Staff:</strong> {{ staff_name }}</li>
+        <li><strong>Date:</strong> {{ appointment_date }}</li>
+        <li><strong>Time:</strong> {{ start_time }} - {{ end_time }}</li>
+        <li><strong>Total Price:</strong> ${{ total_price }}</li>
+        <li><strong>Notes:</strong> {{ note }}</li>
+    </ul>
+
+    <p>Thank you for choosing our service!</p>
+
+    <p>Best regards,<br>The Salon Team</p>
+</body>
+</html>

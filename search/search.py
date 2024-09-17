@@ -1,9 +1,9 @@
-from django.db.models import Q, Count
-from saloons.models import Saloon
+from django.db.models import Q, Count,Avg
+from saloons.models import Saloon,Amenities
 from services.models import Service, ServiceVariation
 from staffs.models import Staff
 
-def search(query=None, category=None, price_min=None, price_max=None, popular_saloons=None, location=None, country_id=None):
+def search(query=None,  price_min=None, price_max=None, popular_saloons=None, location=None, country_id=None,amenities=None,sort_price=None,ratings=None):
     """
     Search and filter across Saloon, Service, Staff, and ServiceVariation models.
     """
@@ -20,8 +20,6 @@ def search(query=None, category=None, price_min=None, price_max=None, popular_sa
             Q(long_description__icontains=query) |
             Q(address__icontains=query)
         )
-
-        # Search in Service and ServiceVariation through the Service model
         service_results = service_results.filter(
             Q(name__icontains=query) |
             Q(description__icontains=query)
@@ -35,7 +33,7 @@ def search(query=None, category=None, price_min=None, price_max=None, popular_sa
 
         staff_results = staff_results.filter(
             Q(name__icontains=query) |
-            Q(description__icontains=query)  # Assuming staff model has a description field
+            Q(description__icontains=query)  
 
         )
     if location:
@@ -53,20 +51,38 @@ def search(query=None, category=None, price_min=None, price_max=None, popular_sa
         saloon_results = saloon_results.filter(country_id=country_id)
         service_results = service_results.filter(saloon__country_id=country_id)
         staff_results = staff_results.filter(saloon__country_id=country_id)
-
-    # Filter ServiceVariation by price range
     if price_min:
         service_variation_results = service_variation_results.filter(price__gte=price_min)
 
     if price_max:
         service_variation_results = service_variation_results.filter(price__lte=price_max)
 
-    # Popular Saloon filtering
     if popular_saloons:
         if popular_saloons == 'popular':
-            saloon_results = saloon_results.annotate(review_count=Count('reviews')).order_by('-review_count')
+            saloon_results = saloon_results.annotate(appointment_count=Count('appointment')).order_by('-appointment_count')
         else:
-            saloon_results = saloon_results.annotate(review_count=Count('reviews')).order_by('review_count')
+            saloon_results = saloon_results.annotate(appointment_count=Count('appointment')).order_by('appointment_count')
+
+    if amenities:
+        if isinstance(amenities, str):
+            amenities = [amenities] 
+
+        if isinstance(amenities, list):
+            amenities = [amenity.strip() for amenity in amenities if amenity]
+            saloon_results = saloon_results.filter(amenities__name__in=amenities)
+
+    if sort_price == 'low_to_high':
+        service_variation_results = service_variation_results.order_by('price')
+    elif sort_price == 'high_to_low':
+        service_variation_results = service_variation_results.order_by('-price')
+
+    if ratings:
+        saloon_results = saloon_results.annotate(average_rating=Avg('reviews__rating')).filter(
+            average_rating__isnull=False,
+            average_rating=ratings 
+        )
+
+
 
     return {
         'saloons': saloon_results,
