@@ -22,7 +22,6 @@ from saloons.models import Saloon
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.mail import send_confirmation_email
 from core.utils.appointment import calculate_total_appointment_price, book_appointment,calculate_appointment_end_time
-from core.utils.appointmentslot import get_next_occurrence_of_day
 from datetime import datetime,timedelta
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -41,7 +40,6 @@ class BookAppointmentAPIView(APIView):
             ).send(400)
 
         validated_data = serializer.validated_data
-        print(validated_data)
 
         saloon_id = validated_data['saloon_id']
         service_variations_ids = validated_data['service_variation_ids']
@@ -94,7 +92,6 @@ class BookAppointmentAPIView(APIView):
                 message="Payment failed",
                 errors={"payment_errors": str(e)}
             ).send(400)
-        print(request.user)
        
         appointment = Appointment(
             user=request.user if request.user.is_authenticated else None,

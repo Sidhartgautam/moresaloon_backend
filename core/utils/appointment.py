@@ -16,9 +16,11 @@ def calculate_total_appointment_price(service_variations_uuids):
     for variation_uuid in service_variations_uuids:
         try:
             variation = ServiceVariation.objects.get(id=variation_uuid)
-            total_price += variation.price if variation.price else 0
+            price = variation.discount_price if variation.discount_price else variation.price
+            total_price += price
+            # total_price += variation.price if variation.get_price else 0
+            print("Total Price:", total_price)
         except ServiceVariation.DoesNotExist:
-            # Handle the case where a ServiceVariation with the given UUID does not exist
             raise ValueError(f"ServiceVariation with UUID {variation_uuid} does not exist")
 
     return total_price

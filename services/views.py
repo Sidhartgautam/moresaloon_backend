@@ -140,7 +140,7 @@ class ServiceImageUploadView(generics.GenericAPIView):
 
 class ServiceVariationListView(generics.GenericAPIView):
     serializer_class = ServiceVariationSerializer
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     pagination_class = CustomPageNumberPagination 
 
     def get_queryset(self):
