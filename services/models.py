@@ -57,9 +57,19 @@ class ServiceVariation(models.Model):
     name =models.CharField(max_length=255)
     duration =models.DurationField(help_text="Duration of the service (e.g., 1 hour, 30 minutes)")
     price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Additional price for this variation",null=True, blank=True)
+    discount_price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Discounted price for this variation",null=True, blank=True)
 
     def __str__(self):
         return f"{self.name} - {self.service.name}"
+    def get_price(self):
+        if self.discount_price>0:
+            return self.discount_price
+        return self.price
+    
+    def get_dis_price(self):
+        if self.discount_price:
+            return self.price
+        return None
     
 class ServiceVariationImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

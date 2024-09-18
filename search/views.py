@@ -11,7 +11,7 @@ class SearchView(GenericAPIView):
         query = request.query_params.get('query', None)
         price_min = request.query_params.get('price_min', None)
         price_max = request.query_params.get('price_max', None)
-        popular_saloons = request.query_params.get('popular_saloons', None)
+        preferences = request.query_params.get('preferences', None)
         location = request.query_params.get('location', None) 
         country_id = request.query_params.get('country_id', None)
         amenities = request.query_params.get('amenities', None)
@@ -22,7 +22,7 @@ class SearchView(GenericAPIView):
             query=query, 
             price_min=price_min, 
             price_max=price_max, 
-            popular_saloons=popular_saloons,
+            preferences=preferences,
             location=location,
             country_id=country_id,
             amenities = amenities,
@@ -32,10 +32,14 @@ class SearchView(GenericAPIView):
 
         )
         
-        saloon_serializer = SaloonSerializer(results['saloons'], many=True)
-        service_serializer = ServiceSerializer(results['services'], many=True)
-        staff_serializer = StaffSerializer(results['staff'], many=True)
-        service_variation_serializer = NestedServiceVariationSerializer(results['service_variations'], many=True)
+        # saloon_serializer = SaloonSerializer(results['saloons'], many=True)
+        # service_serializer = ServiceSerializer(results['services'], many=True)
+        # staff_serializer = StaffSerializer(results['staff'], many=True)
+        # service_variation_serializer = NestedServiceVariationSerializer(results['service_variations'], many=True)
+        saloon_serializer = SaloonSerializer(results.get('saloons', []), many=True)
+        service_serializer = ServiceSerializer(results.get('services', []), many=True)
+        staff_serializer = StaffSerializer(results.get('staff', []), many=True)
+        service_variation_serializer = NestedServiceVariationSerializer(results.get('service_variations', []), many=True)
 
 
         response_data = {
