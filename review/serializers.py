@@ -29,4 +29,10 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     # def get_image(self, obj):
     #     return obj.user.profile_image.url
+
+class ReviewCreateSerializer(serializers.ModelSerializer):
+    comment = serializers.CharField(required=True)
     
+    class Meta:
+        model = Review
+        fields = ['id', 'rating', 'comment']

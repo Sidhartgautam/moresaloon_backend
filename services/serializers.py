@@ -8,9 +8,11 @@ class ServiceVariationSerializer(serializers.ModelSerializer):
     saloon = serializers.SerializerMethodField() 
     price=serializers.SerializerMethodField()
     discount_percentage = serializers.SerializerMethodField()
+    currency_symbol = serializers.SerializerMethodField()
+    currency_code=serializers.SerializerMethodField()
     class Meta:
         model = ServiceVariation
-        fields = ['id', 'name','saloon','duration','price','discount_price','discount_percentage','description','image']
+        fields = ['id', 'name','saloon','duration','price','discount_price','discount_percentage','description','image','currency_symbol','currency_code']
 
     def get_image(self, obj):
         image = ServiceVariationImage.objects.filter(variation=obj).first()  
@@ -31,6 +33,12 @@ class ServiceVariationSerializer(serializers.ModelSerializer):
             return int(((obj.price - obj.discount_price) / obj.price) * 100)
         else:
             return None
+        
+    def get_currency_symbol(self, obj):
+        return obj.service.saloon.currency.symbol
+    
+    def get_currency_code(self, obj):
+        return obj.service.saloon.currency.currency_code
 
 
 class ServiceVariationImageSerializer(serializers.ModelSerializer):

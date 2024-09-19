@@ -1,6 +1,6 @@
 from rest_framework import generics, permissions
 from .models import Review
-from .serializers import ReviewSerializer
+from .serializers import ReviewSerializer, ReviewCreateSerializer
 from saloons.models import Saloon
 from rest_framework.exceptions import ValidationError
 from core.utils.response import PrepareResponse
@@ -51,7 +51,7 @@ class UserReviewListView(generics.GenericAPIView):
         return response.send(code=200)
 
 class ReviewCreateView(generics.CreateAPIView):
-    serializer_class = ReviewSerializer
+    serializer_class = ReviewCreateSerializer
 
     @permission_classes([permissions.IsAuthenticated])
     def post(self, request, *args, **kwargs):
