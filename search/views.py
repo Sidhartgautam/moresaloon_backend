@@ -32,10 +32,9 @@ class SearchView(GenericAPIView):
 
         )
         
-        # saloon_serializer = SaloonSerializer(results['saloons'], many=True)
-        # service_serializer = ServiceSerializer(results['services'], many=True)
-        # staff_serializer = StaffSerializer(results['staff'], many=True)
-        # service_variation_serializer = NestedServiceVariationSerializer(results['service_variations'], many=True)
+        if results is None:
+            return Response({'message': 'No results found'}, status=status.HTTP_200_OK)
+
         saloon_serializer = SaloonSerializer(results.get('saloons', []), many=True)
         service_serializer = ServiceSerializer(results.get('services', []), many=True)
         staff_serializer = StaffSerializer(results.get('staff', []), many=True)

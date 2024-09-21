@@ -155,6 +155,33 @@ class BookAppointmentAPIView(APIView):
 
         except requests.RequestException as e:
             raise ValidationError(f"Payment request error: {str(e)}")
+    
+    def process_moredeals_payment(self, request, amount, saloon, data, payment_method):
+        pin = request.data.get('pin')
+        if not pin:
+            return PrepareResponse(
+                success=False,
+                message="PIN not provided for MoreDeals payment",
+                errors={"non_field_errors": ["PIN not provided for MoreDeals payment"]}
+            ).send(400)
+
+        url = f"https://moretrek.com/api/payments/payment-through-balance/"
+        access_token = get_moredeals_token(request)
+        
+        response = requests.post(url, data={
+            'amount': amount,
+            'pin': pin,
+            'recipient': saloon.user.username,
+            'currency_code': saloon.currency.currency_code,
+            'remarks': f'Payment from {payment_method}',
+        }, headers={'Authorization': f"{access_token}"})
+
+        if response.status_code == 200:
+            return book_appointment(request, data), True
+        else:
+            print(response.json())
+            errors = response.json()['errors']['non_field_errors'][0]
+            return errors, False
         
     
 class AppointmentListAPIView(generics.GenericAPIView):
