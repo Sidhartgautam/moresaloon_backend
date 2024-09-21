@@ -16,12 +16,19 @@ def search(query=None, price_min=None, price_max=None, preferences=None, locatio
     service_results = Service.objects.none()
     staff_results = Staff.objects.none()
     service_variation_results = ServiceVariation.objects.none()
+    
 
     # Determine if we have relevant parameters for each model
     has_saloon_params = any([query, location, country_id, preferences, amenities, ratings])
     has_service_params = any([query, price_min, price_max])
     has_staff_params = any([query, location, country_id])
-    has_service_variation_params = any([price_min, price_max, sort_price])
+    has_service_variation_params = any([price_min, price_max, sort_price, query])
+    if not has_saloon_params and not has_service_params and not has_staff_params and not has_service_variation_params:
+        saloon_results = Saloon.objects.all()
+        service_results = Service.objects.all()
+        staff_results = Staff.objects.all()
+        service_variation_results = ServiceVariation.objects.all()
+
 
     # Search in Saloon
     if has_saloon_params:
@@ -75,6 +82,11 @@ def search(query=None, price_min=None, price_max=None, preferences=None, locatio
     # Search in Service Variation
     if has_service_variation_params:
         service_variation_results = ServiceVariation.objects.all()
+        if query:
+            service_variation_results = service_variation_results.filter(
+                Q(name__icontains=query) |
+                Q(description__icontains=query)
+            )
         if price_min:
             service_variation_results = service_variation_results.filter(price__gte=price_min)
         if price_max:
