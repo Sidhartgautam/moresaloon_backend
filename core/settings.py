@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'offers',
     'openinghours',
     'payments',
+    'moreclub'
 ]
 
 MIDDLEWARE = [
