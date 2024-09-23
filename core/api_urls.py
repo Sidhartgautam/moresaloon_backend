@@ -13,4 +13,6 @@ urlpatterns = [
     path('offers/', include('offers.urls')),
     path ('openinghours/', include('openinghours.urls')),
     path('payments/', include('payments.urls')),
+    path('moreclub/',include('moreclub.urls')),
+    path('meta/', include('meta.urls')),
 ]

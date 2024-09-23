@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from saloons.models import Saloon
 from country.models import Country,Currency
-from services.models import Service, ServiceVariation
+from services.models import Service, ServiceVariation, ServiceImage, ServiceVariationImage
 from services.serializers import ServiceVariationSerializer
 
 
@@ -63,30 +63,87 @@ class SaloonSerializer(serializers.Serializer):
     
 ##########################Services###########################
 
+class ServiceImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceImage
+        fields = ['id', 'image']
+
+class ServiceVariationImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceVariationImage
+        fields = ['id', 'image']
+
 class ServiceVariationSerializer(serializers.ModelSerializer):
+    images = ServiceVariationImageSerializer(many=True, required=False)
+
     class Meta:
         model = ServiceVariation
-        field=['id','name']
+        fields = ['id', 'name', 'description', 'duration', 'price', 'discount_price', 'images']
 
+    def create(self, validated_data):
+        images_data = validated_data.pop('images', [])
+        variation = ServiceVariation.objects.create(**validated_data)
 
+        for image_data in images_data:
+            ServiceVariationImage.objects.create(variation=variation, **image_data)
 
-class ServiceSerializer(serializers.ModelSerialzier):
-    id = serializers.UUIDField(read_only=True)
-    name = serializers.CharField(max_length=255)
-    description = serializers.CharField()
-    min_duration = serializers.DurationField()
-    max_duration = serializers.DurationField()
-    image = serializers.ImageField()
-    slug = serializers.SlugField()
+        return variation
+
+class ServiceSerializer(serializers.ModelSerializer):
+    images = ServiceImageSerializer(many=True, required=False)
+    variations = ServiceVariationSerializer(many=True, required=False)
 
     class Meta:
         model = Service
-        field=['id','name', 'description', 'min_duration', 'max_duration', 'image','slug']
+        fields = ['id', 'name', 'description', 'min_duration', 'max_duration', 'images', 'variations']
 
-class ServiceVariationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model= ServiceVariation
-        field=['id','name','price']
+    def create(self, validated_data):
+        images_data = validated_data.pop('images', [])
+        variations_data = validated_data.pop('variations', [])
+        service = Service.objects.create(**validated_data)
+
+        # Save service images
+        for image_data in images_data:
+            ServiceImage.objects.create(service=service, **image_data)
+
+        # Save service variations
+        for variation_data in variations_data:
+            images = variation_data.pop('images', [])
+            variation = ServiceVariation.objects.create(service=service, **variation_data)
+
+            # Save variation images
+            for image_data in images:
+                ServiceVariationImage.objects.create(variation=variation, **image_data)
+
+        return service
+
+    def update(self, instance, validated_data):
+        images_data = validated_data.pop('images', [])
+        variations_data = validated_data.pop('variations', [])
+
+        # Update basic service fields
+        instance.name = validated_data.get('name', instance.name)
+        instance.description = validated_data.get('description', instance.description)
+        instance.min_duration = validated_data.get('min_duration', instance.min_duration)
+        instance.max_duration = validated_data.get('max_duration', instance.max_duration)
+        instance.save()
+
+        # Update or replace service images
+        instance.images.all().delete()
+        for image_data in images_data:
+            ServiceImage.objects.create(service=instance, **image_data)
+
+        # Update or replace service variations
+        instance.variations.all().delete()
+        for variation_data in variations_data:
+            images = variation_data.pop('images', [])
+            variation = ServiceVariation.objects.create(service=instance, **variation_data)
+
+            # Update variation images
+            for image_data in images:
+                ServiceVariationImage.objects.create(variation=variation, **image_data)
+
+        return instance
         
 
 

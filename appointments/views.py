@@ -480,9 +480,9 @@ class AppointmentUpdateAPIView(generics.GenericAPIView):
         return response.send(200)
     
 
-      # if not request.user.is_authenticated:
-        #     return PrepareResponse(
-        #         success=False,
-        #         message="Authentication required.",
-        #         errors={"non_field_errors": ["User must be authenticated to book an appointment."]}
-        #     ).send(403)
+    #   if not request.user.is_authenticated:
+    #         return PrepareResponse(
+    #             success=False,
+    #             message="Authentication required.",
+    #             errors={"non_field_errors": ["User must be authenticated to book an appointment."]}
+    #         ).send(403)
