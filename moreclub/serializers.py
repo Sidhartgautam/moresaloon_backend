@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from saloons.models import Saloon
 from country.models import Country,Currency
+from staffs.models import Staff, WorkingDay
 from services.models import Service, ServiceVariation, ServiceImage, ServiceVariationImage
 from services.serializers import ServiceVariationSerializer
 
@@ -144,6 +145,24 @@ class ServiceSerializer(serializers.ModelSerializer):
                 ServiceVariationImage.objects.create(variation=variation, **image_data)
 
         return instance
+    
+########################################################Staffs##########################################################################
+class StaffSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Staff
+        fields = ['id', 'saloon', 'name', 'email', 'contact_no', 'image']
+    
+    def create(self, validated_data):
+        staff = Staff.objects.create(**validated_data)
+        return staff
+    
+class WorkingDaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkingDay
+        fields = ['id', 'staff', 'day_of_week', 'start_time', 'end_time', 'break_times']
+    def create(self, validated_data):
+        working_day = WorkingDay.objects.create(**validated_data)
+        return working_day
         
 
 

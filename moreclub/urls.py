@@ -4,7 +4,9 @@ from moreclub.views import (
     SaloonDetailUpdateView,
     UserSaloonListView,
     ServiceListCreateView,
-    ServiceDetailUpdateDeleteView
+    ServiceDetailUpdateDeleteView,
+    WorkingDayDetailUpdateDeleteView
+
 )
 
 urlpatterns = [
@@ -16,4 +18,8 @@ urlpatterns = [
     #############################service and service_variations##########################################
     path('services/', ServiceListCreateView.as_view(), name='service-list-create'),
     path('services/<uuid:pk>/', ServiceDetailUpdateDeleteView.as_view(), name='service-detail'),
+
+    #################################Staff Details################################################
+    path('users/staff/<uuid:staff_id>', ServiceDetailUpdateDeleteView.StaffDetailUpdateDeleteView.as_view(), name='staff-detail-update-delete'),
+     path('working-days/<uuid:working_day_id>/', WorkingDayDetailUpdateDeleteView.as_view(), name='working-day-detail-update-delete'),
 ]

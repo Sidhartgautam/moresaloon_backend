@@ -2,6 +2,7 @@ from rest_framework import generics
 from rest_framework.views import APIView
 from saloons.models import Saloon
 from services.models import Service
+from staffs.models import Staff,WorkingDay
 from moreclub.serializers import SaloonSerializer,ServiceSerializer
 from core.utils.response import PrepareResponse
 from rest_framework.permissions import IsAuthenticated
@@ -9,6 +10,7 @@ from core.utils.pagination import CustomPageNumberPagination
 from core.utils.auth import SaloonPermissionMixin
 from core.utils.permissions import IsSaloonPermission
 from django.shortcuts import get_object_or_404
+from staffs.serializers import StaffSerializer,WorkingDaySerializer
 
 
 
@@ -159,4 +161,97 @@ class ServiceDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         )
         return response.send(200)
     
+    ####################################staffs###############################################################
+
+    class StaffDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
+        serializer_class = StaffSerializer
+        permission_classes = [IsAuthenticated, IsSaloonPermission]
+
+        def get_object(self):
+            # Fetch staff member only if they belong to the current user's salon
+            staff = get_object_or_404(Staff, pk=self.kwargs['staff_id'], saloon__user=self.request.user)
+            return staff
+
+        def get(self, request, *args, **kwargs):
+            staff = self.get_object()
+            serializer = self.get_serializer(staff)
+            response = PrepareResponse(
+                success=True,
+                data=serializer.data,
+                message="Staff details fetched successfully"
+            )
+            return response.send(200)
+
+        def patch(self, request, *args, **kwargs):
+            staff = self.get_object()
+            serializer = self.get_serializer(staff, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                response = PrepareResponse(
+                    success=True,
+                    data=serializer.data,
+                    message="Staff updated successfully"
+                )
+                return response.send(200)
+
+            response = PrepareResponse(
+                success=False,
+                data=serializer.errors,
+                message="Failed to update staff"
+            )
+            return response.send(400)
+
+        def delete(self, request, *args, **kwargs):
+            staff = self.get_object()
+            staff.delete()
+            response = PrepareResponse(
+                success=True,
+                message="Staff deleted successfully"
+            )
+            return response.send(200)
+        
+
+class WorkingDayDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = WorkingDaySerializer
+    permission_classes = [IsAuthenticated, IsSaloonPermission]
+
+    def get_object(self):
+        return get_object_or_404(WorkingDay, pk=self.kwargs['working_day_id'], staff__saloon__user=self.request.user)
+
+    def get(self, request, *args, **kwargs):
+        working_day = self.get_object()
+        serializer = self.get_serializer(working_day)
+        response = PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message="Working day details fetched successfully"
+        )
+        return response.send(200)
+
+    def patch(self, request, *args, **kwargs):
+        working_day = self.get_object()
+        serializer = self.get_serializer(working_day, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            response = PrepareResponse(
+                success=True,
+                data=serializer.data,
+                message="Working day updated successfully"
+            )
+            return response.send(200)
+        response = PrepareResponse(
+            success=False,
+            data=serializer.errors,
+            message="Failed to update working day"
+        )
+        return response.send(400)
+
+    def delete(self, request, *args, **kwargs):
+        working_day = self.get_object()
+        working_day.delete()
+        response = PrepareResponse(
+            success=True,
+            message="Working day deleted successfully"
+        )
+        return response.send(200)
 
