@@ -17,3 +17,25 @@ class HomeView(APIView):
     def get(self, request):
         content = {'message': 'Welcome to the protected route!'}
         return Response(content)
+    
+class GetUserBalance(generics.GenericAPIView):
+    serializer_class = None
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        token = request.headers.get('Authorization')
+        url = f"{main_api_url}wallets/get/balance/"
+        headers = {
+            'Authorization': f"{token}"
+        }
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            response = PrepareResponse(
+                success=False,
+                message="User balance not retrieved"
+            )
+            return response.send(400)
+        
+        response = Response(response.json())
+        return response

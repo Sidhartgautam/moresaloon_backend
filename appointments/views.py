@@ -80,11 +80,14 @@ class BookAppointmentAPIView(APIView):
         total_price = calculate_total_appointment_price(service_variations_ids)
 
         try:
-            payment_status = self.process_payment(
+            payment_status, message = self.process_payment(
+                request=request,
                 payment_method=payment_method,
                 amount=total_price,
                 payment_method_id=payment_method_id,
-                user=request.user if request.user.is_authenticated else None
+                user=request.user if request.user.is_authenticated else None,
+                saloon=saloon,
+                data = data
             )
         except ValidationError as e:
             return PrepareResponse(
@@ -92,58 +95,91 @@ class BookAppointmentAPIView(APIView):
                 message="Payment failed",
                 errors={"payment_errors": str(e)}
             ).send(400)
-       
-        appointment = Appointment(
-            user=request.user if request.user.is_authenticated else None,
-            saloon=saloon,
-            service=service,
-            staff=staff,
-            appointment_slot=slot,
-            date=validated_data['date'],
-            start_time=start_time,
-            end_time=end_time,
-            payment_method=payment_method,
-            payment_status=payment_status,
-            total_price=total_price,
-            fullname = validated_data['fullname'],
-            email = validated_data['email'],
-            phone_number = validated_data['phone_number'],
-            note = validated_data['note']
-            
-        )
-        appointment.save()
+        
+        if payment_status:
+            appointment = Appointment(
+                user=request.user if request.user.is_authenticated else None,
+                saloon=saloon,
+                service=service,
+                staff=staff,
+                appointment_slot=slot,
+                date=validated_data['date'],
+                start_time=start_time,
+                end_time=end_time,
+                payment_method=payment_method,
+                payment_status=payment_status,
+                total_price=total_price,
+                fullname = validated_data['fullname'],
+                email = validated_data['email'],
+                phone_number = validated_data['phone_number'],
+                note = validated_data['note']
+                
+            )
+            appointment.save()
 
-        appointment.service_variation.add(*service_variations_ids)
-        slot.save()
-        send_confirmation_email(appointment)
+            appointment.service_variation.add(*service_variations_ids)
+            slot.save()
+            send_confirmation_email(appointment)
 
-        return PrepareResponse(
-            success=True,
-             message="Appointment booked successfully with payment method: {}".format(payment_method),
-            data=serializer.data
-        ).send(200)
+            return PrepareResponse(
+                success=True,
+                message="Appointment booked successfully with payment method: {}".format(payment_method),
+                data=serializer.data
+            ).send(200)
+        else:
+            return PrepareResponse(
+                success=False,
+                message=f"Payment failed",
+                data={"non_field_errors": [message]},
+                # errors = {"non_field_errors": [message]}
+            ).send(400)
     
     
-    def process_payment(self, payment_method, amount, user, payment_method_id):
+    def process_payment(self, request, payment_method, amount, user, payment_method_id, saloon, data):
         if payment_method == 'coa':
-            return 'Unpaid'
+            return 'Unpaid', "Success"
         elif payment_method =='stripe':
             try:
-                return self.stripe_payment(amount, user, payment_method_id)
+                payment_intent = request.data.get('payment_intent')
+                if not payment_intent:
+                    raise ValueError("Payment intent not provided")
+
+                payment_intent = stripe.PaymentIntent.confirm(
+                    payment_intent,
+                      payment_method=payment_method_id,
+                      return_url='http://127.0.0.1:8000/appointments/book'
+                      )
+                print("payment_intent: ", payment_intent)
+
+                if payment_intent['status'] != 'succeeded':
+                    raise ValueError(f"Payment failed with status: {payment_intent['status']}")
+                else:
+                    return self.stripe_payment(request,amount,saloon, payment_method_id)
             except stripe.error.CardError as e:
                 raise ValidationError(str(e))
+        elif payment_method == 'moredeals':
+            try:
+                moredeals_status, message = self.process_moredeals_payment(request,amount,saloon, payment_method, data)
+                return moredeals_status, message
+            except Exception as e:
+                raise ValidationError(str(e))
 
-    def stripe_payment(self, amount, user, payment_method_id):
+    def stripe_payment(self,request,amount,saloon, payment_method_id):
         try:
-            # Send request to the external payment API
-            url = "https://moretrek.com/api/payments/all/stripe/create-payment-intent/"
+            payment_method_get = stripe.PaymentMethod.retrieve(payment_method_id)
+            payer_detail = self.get_payer_detail(payment_method_get)
+            
+            url = "http://192.168.1.73:8000/api/payments/payment-through-stripe/"
             
             response = requests.post(
                 url,
                 json={
-                    'currency': 'usd', 
-                    'payment_method': payment_method_id,
-                    'price': amount
+                'amount': amount,
+                'payer_detail': payer_detail,
+                "brand": payment_method_get['type'],
+                'recipient': saloon.user.username,
+                'from_project': 'moresaloon',
+                'currency_code': saloon.currency.currency_code
                 },
                 headers={'Content-Type': 'application/json'}
             )
@@ -156,7 +192,17 @@ class BookAppointmentAPIView(APIView):
         except requests.RequestException as e:
             raise ValidationError(f"Payment request error: {str(e)}")
     
-    def process_moredeals_payment(self, request, amount, saloon, data, payment_method):
+    def get_payer_detail(self, payment_method_get):
+        if payment_method_get['type'] == 'card':
+            return payment_method_get['card']['last4']
+        elif payment_method_get['type'] == 'paypal':
+            return payment_method_get['paypal']['payer_email']
+        elif payment_method_get['type'] == 'swish':
+            return payment_method_get['type']
+        return ''
+        
+    
+    def process_moredeals_payment(self, request,amount,saloon, payment_method, data):
         pin = request.data.get('pin')
         if not pin:
             return PrepareResponse(
@@ -164,6 +210,7 @@ class BookAppointmentAPIView(APIView):
                 message="PIN not provided for MoreDeals payment",
                 errors={"non_field_errors": ["PIN not provided for MoreDeals payment"]}
             ).send(400)
+        
 
         url = f"https://moretrek.com/api/payments/payment-through-balance/"
         access_token = get_moredeals_token(request)
@@ -174,14 +221,13 @@ class BookAppointmentAPIView(APIView):
             'recipient': saloon.user.username,
             'currency_code': saloon.currency.currency_code,
             'remarks': f'Payment from {payment_method}',
+            'platform':'moresaloon'
         }, headers={'Authorization': f"{access_token}"})
-
         if response.status_code == 200:
-            return book_appointment(request, data), True
+            return True, "Success"
         else:
-            print(response.json())
             errors = response.json()['errors']['non_field_errors'][0]
-            return errors, False
+            return False, errors
         
     
 class AppointmentListAPIView(generics.GenericAPIView):

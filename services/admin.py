@@ -8,7 +8,7 @@ class ServiceAdmin(admin.ModelAdmin):
 
 @admin.register(ServiceVariation)
 class ServiceVariationAdmin(admin.ModelAdmin):
-    list_display = ['service', 'name', 'duration', 'price','description']
+    list_display = ['service', 'name', 'duration', 'price','description','discount_price']
     
 
 

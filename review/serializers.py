@@ -9,7 +9,7 @@ class ReviewSerializer(serializers.ModelSerializer):
     # image = serializers.SerializerMethodField()
     class Meta:
         model = Review
-        fields = ['id', 'saloon','user_id','saloon_id', 'full_name', 'rating', 'comment', 'created_at']
+        fields = ['id','user_id','saloon_id','saloon', 'full_name', 'rating', 'comment', 'created_at']
         read_only_fields = ['id','saloon', 'user','created_at']
 
     def validate_rating(self, value):

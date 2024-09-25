@@ -6,7 +6,7 @@ from appointments.models import Appointment
 
 from django.db.models import Q, Count, Avg
 
-def search(query=None, price_min=None, price_max=None, preferences=None, location=None, country_id=None, amenities=None, sort_price=None, ratings=None):
+def search(query=None, price_min=None, price_max=None, preferences=None, location=None, country_id=None, amenities=None, sort_price=None,discount_percentage=None, ratings=None):
     """
     Search and filter across Saloon, Service, Staff, and ServiceVariation models.
     """
@@ -95,6 +95,16 @@ def search(query=None, price_min=None, price_max=None, preferences=None, locatio
             service_variation_results = service_variation_results.order_by('price')
         elif sort_price == 'high_to_low':
             service_variation_results = service_variation_results.order_by('-price')
+        if discount_percentage:
+            if discount_percentage == 'up_to_10':
+                service_variation_results = service_variation_results.filter(discount_percentage__lte=10)
+            elif discount_percentage == 'up_to_25':
+                service_variation_results = service_variation_results.filter(discount_percentage__lte=25)
+            elif discount_percentage == 'up_to_50':
+                service_variation_results = service_variation_results.filter(discount_percentage__lte=50)
+            elif discount_percentage == 'up_to_75':
+                service_variation_results = service_variation_results.filter(discount_percentage__lte=75)
+
 
     # Prepare response
     response = {}

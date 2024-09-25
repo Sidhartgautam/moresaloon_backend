@@ -23,7 +23,7 @@ class ServiceVariationSerializer(serializers.ModelSerializer):
         return float(obj.price)
 
     def get_dis_price(self, obj):
-        if obj.discount_price:
+        if obj.discount_price and obj.discount_price > 0:
             return float(obj.discount_price)
         else:
             return float(obj.price)
@@ -59,36 +59,19 @@ class ServiceImageSerializer(serializers.ModelSerializer):
     def get_image(self, obj):        
         return obj.image.url
 
-
-
-class ServiceSerializer(serializers.ModelSerializer):
-    image = serializers.SerializerMethodField()
-    description = serializers.CharField()
-    variations = ServiceVariationSerializer(many=True, read_only=True)
-    # appointments_count= serializers.IntegerField(read_only=True)
-    class Meta:
-        model = Service
-        fields = ['id','name', 'description','variations', 'min_duration', 'max_duration', 'image','slug']
-
-    def get_image(self, obj):
-        image = ServiceImage.objects.filter(service=obj).first()
-        return image.image.url if image else None
-
-class ServiceCreateUpdateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Service
-        fields = ['saloon', 'name', 'description', 'duration', 'price']
-
 class NestedServiceVariationSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     saloon_id = serializers.SerializerMethodField(read_only=True) 
     saloon_name = serializers.SerializerMethodField(read_only=True)
     service_id = serializers.SerializerMethodField(read_only=True)
     address = serializers.SerializerMethodField(read_only=True) 
-    discount_percentage = serializers.SerializerMethodField(read_only=True)  
+    discount_percentage = serializers.SerializerMethodField(read_only=True)
+    currency_symbol = serializers.SerializerMethodField()
+    currency_code=serializers.SerializerMethodField() 
+     
     class Meta:
         model = ServiceVariation
-        fields =['id','saloon_id','saloon_name','address','service_id','name','price','discount_price','discount_percentage','image','description','duration']
+        fields =['id','saloon_id','saloon_name','address','service_id','name','price','discount_price','discount_percentage','image','description','duration','currency_symbol','currency_code']
 
     def get_saloon_id(self, obj):
         return obj.service.saloon.id
@@ -110,6 +93,31 @@ class NestedServiceVariationSerializer(serializers.ModelSerializer):
     def get_image(self, obj):
         image = ServiceVariationImage.objects.filter(variation=obj).first()
         return image.image.url if image else None
+    def get_currency_symbol(self, obj):
+        return obj.service.saloon.currency.symbol
+    
+    def get_currency_code(self, obj):
+        return obj.service.saloon.currency.currency_code
+
+class ServiceSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+    description = serializers.CharField()
+    variations = NestedServiceVariationSerializer(many=True, read_only=True)
+    # appointments_count= serializers.IntegerField(read_only=True)
+    class Meta:
+        model = Service
+        fields = ['id','name', 'description','variations', 'min_duration', 'max_duration', 'image','slug']
+
+    def get_image(self, obj):
+        image = ServiceImage.objects.filter(service=obj).first()
+        return image.image.url if image else None
+
+class ServiceCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Service
+        fields = ['saloon', 'name', 'description', 'duration', 'price']
+
+
     
 class NestedServiceSerializer(serializers.ModelSerializer):#service category
     variations = serializers.SerializerMethodField(read_only=True)

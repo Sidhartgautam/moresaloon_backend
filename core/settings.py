@@ -36,7 +36,7 @@ STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*','192.168.1.80:8000','moresaloon-backend.vercel.app']
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -69,7 +69,8 @@ INSTALLED_APPS = [
     'openinghours',
     'payments',
     'moreclub',
-    'meta'
+    'meta',
+    'userdashboard'
 ]
 
 MIDDLEWARE = [
@@ -171,7 +172,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "http://192.168.1.70:3000",
+    "http://192.168.1.80:3000",
     "https://more-saloon.vercel.app"
 
 
@@ -222,20 +223,3 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 
-# JAZZMIN_SETTINGS = {
-#     "site_title": "More Saloon Admin",
-#     "site_header": "Saloon Admin",
-#     "site_brand": "SaloOn Admin",
-#     "welcome_sign": "Welcome to the More Saloon Admin Portal",
-#     "site_logo": None,
-#     "site_icon": None,
-#     "topmenu_links": [
-#         {"name": "Home", "url": "admin:index", "permissions": ["auth.view_user"]},
-#         {"app": "saloon"},
-#     ],
-#     "changeform_format": "horizontal_tabs",
-#     "show_sidebar": True,
-#     "navigation_expanded": False,
-#     "custom_css": None,
-#     "custom_js": None,
-# }

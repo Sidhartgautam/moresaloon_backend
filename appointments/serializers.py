@@ -106,19 +106,23 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
+        print(data)
         staff_id = data['staff_id']
+        saloon_id = data['saloon_id']
         date = data['date']
         service_id = data['service_id']
         service_variations_ids = data.get('service_variation_ids', [])
         buffer_time = data.get('buffer_time', timedelta(minutes=10))
         slot_id = data.get('appointment_slot_id')
+        user = self.context['request'].user
+
     
-
+        saloon = Saloon.objects.get(id=saloon_id)
+        if saloon.user==user:
+            raise serializers.ValidationError("You cannot book the appointment on your own saloon.")
+        
         if date and date < datetime.now().date():
-            raise serializers.ValidationError("The date cannot be in the past.")
-        
-        
-
+            raise serializers.ValidationError("The date cannot be in the past.") 
         # Fetch Staff and Service using IDs
         try:
             staff = Staff.objects.get(id=staff_id)
@@ -181,6 +185,7 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
         if overlapping_appointments:
             raise serializers.ValidationError("This staff member already has an appointment at this time.")
 
+
         return data
     
 
@@ -213,9 +218,16 @@ class AppointmentListSerializer(serializers.ModelSerializer):
         fields = ['user', 'saloon', 'service', 'staff', 'service_variation', 'date', 'start_time', 'end_time', 'appointment_slot','total_price', 'payment_status', 'payment_method', 'fullname', 'email', 'phone_number', 'note']
 
 class AppointmentServiceVariationListSerializer(serializers.ModelSerializer):
+    price=serializers.SerializerMethodField()
     class Meta:
         model = ServiceVariation
         fields = ['id', 'name', 'duration','price']
+
+    def get_price(self, obj):
+        if obj.discount_price:
+            return obj.discount_price
+        else:
+            return obj.price
         
 class UserAppointmentListSerializer(serializers.ModelSerializer):
     saloon = serializers.StringRelatedField()

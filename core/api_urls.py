@@ -15,4 +15,5 @@ urlpatterns = [
     path('payments/', include('payments.urls')),
     path('moreclub/',include('moreclub.urls')),
     path('meta/', include('meta.urls')),
+    path('userdashboard/', include('userdashboard.urls')),
 ]
