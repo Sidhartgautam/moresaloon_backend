@@ -7,3 +7,4 @@ admin.site.register(Philosophy)
 admin.site.register(FAQ)
 admin.site.register(PrivacyPolicy)
 admin.site.register(TermsAndCondition)
+

@@ -165,10 +165,6 @@ class BookAppointmentAPIView(APIView):
                 raise ValidationError(str(e))
 
     def stripe_payment(self,request,amount,saloon, payment_method_id):
-        print("payment_method_id: ", payment_method_id)
-        print("amount: ", amount)
-        print("saloon: ", saloon)
-        print("request: ", request)
         try:
             payment_method_get = stripe.PaymentMethod.retrieve(payment_method_id)
             payer_detail = self.get_payer_detail(payment_method_get)
@@ -189,7 +185,6 @@ class BookAppointmentAPIView(APIView):
             )
             if response.status_code == 200:
                 payment_data = response.json()
-                print("response: ", payment_data)
                 return 'Paid'
             else:
                 raise ValidationError("Payment failed: {}".format(response.json().get('error', 'Unknown error')))

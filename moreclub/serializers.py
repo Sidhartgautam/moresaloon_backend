@@ -4,6 +4,8 @@ from country.models import Country,Currency
 from staffs.models import Staff, WorkingDay
 from services.models import Service, ServiceVariation, ServiceImage, ServiceVariationImage
 from services.serializers import ServiceVariationSerializer
+from appointments.models import Appointment, AppointmentSlot
+from appointments.serializers import AppointmentSlotSerializer
 
 
 ####################################USER########################################
@@ -15,14 +17,14 @@ class UserNameSerializer(serializers.Serializer):
 ####################################SALOON########################################
 class SaloonSerializer(serializers.Serializer):
     id=serializers.UUIDField(read_only=True)
+    country_code= serializers.SerializerMethodField(read_only=True)
+    currency_code = serializers.SerializerMethodField(read_only=True)
+    country = serializers.PrimaryKeyRelatedField(queryset=Country.objects.all())
+    currency=serializers.PrimaryKeyRelatedField(queryset=Currency.objects.all())
     name = serializers.CharField(max_length=255)
     address = serializers.CharField(max_length=255)
     short_description = serializers.CharField(max_length=255)
     long_description = serializers.CharField(max_length=255)
-    country_code= serializers.SerializerMethodField()
-    country = serializers.PrimaryKeyRelatedField(queryset=Country.objects.all())
-    currency_code = serializers.SerializerMethodField()
-    currency=serializers.PrimaryKeyRelatedField(queryset=Currency.objects.all())
     lat = serializers.FloatField()
     lng = serializers.FloatField()
     email = serializers.EmailField()
@@ -35,10 +37,10 @@ class SaloonSerializer(serializers.Serializer):
 
 
     def get_country_code(self, obj):
-        return obj.saloon.country.code
+        return obj.country.code 
 
     def get_currency_code(self, obj):
-        return obj.saloon.currency.currency_code
+        return obj.currency.symbol
     def create(self, validated_data):
         saloon = Saloon.objects.create(**validated_data)
         return Saloon
@@ -163,6 +165,17 @@ class WorkingDaySerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         working_day = WorkingDay.objects.create(**validated_data)
         return working_day
+    
+
+#################################################Appointments and Appointment Slots##################################################
+class AppointmentSlotSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AppointmentSlot
+        fields = ['id', 'saloon', 'date', 'slots']
+    
+    def create(self, validated_data):
+        appointment_slot = AppointmentSlot.objects.create(**validated_data)
+        return appointment_slot
         
 
 

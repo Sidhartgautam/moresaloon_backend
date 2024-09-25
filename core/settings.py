@@ -36,7 +36,7 @@ STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*','192.168.1.80:8000','moresaloon-backend.vercel.app']
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -69,7 +69,8 @@ INSTALLED_APPS = [
     'openinghours',
     'payments',
     'moreclub',
-    'meta'
+    'meta',
+    'userdashboard'
 ]
 
 MIDDLEWARE = [

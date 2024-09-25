@@ -12,7 +12,7 @@ from moreclub.views import (
 urlpatterns = [
     ###############################saloon##################################################################
     path ('saloon/setup/',SaloonSetupView.as_view(),name='setup-saloon'),
-    path('users/saloon/<uuid:saloon_id/',SaloonDetailUpdateView.as_view(),name='saloon-details'),
+    path('users/saloon/<uuid:saloon_id>/',SaloonDetailUpdateView.as_view(),name='saloon-details'),
     path('users/saloons/list/',UserSaloonListView.as_view(),name='user_saloon_list'),
 
     #############################service and service_variations##########################################
