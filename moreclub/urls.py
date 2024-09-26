@@ -5,7 +5,11 @@ from moreclub.views import (
     UserSaloonListView,
     ServiceListCreateView,
     ServiceDetailUpdateDeleteView,
-    WorkingDayDetailUpdateDeleteView
+    StaffDetailUpdateDeleteView,
+    WorkingDayDetailUpdateDeleteView,
+    StaffCreateView,
+    OpeningHourListCreateView,
+    OpeningHourDetailUpdateDeleteView
 
 )
 
@@ -16,10 +20,17 @@ urlpatterns = [
     path('users/saloons/list/',UserSaloonListView.as_view(),name='user_saloon_list'),
 
     #############################service and service_variations##########################################
-    path('services/', ServiceListCreateView.as_view(), name='service-list-create'),
-    path('services/<uuid:pk>/', ServiceDetailUpdateDeleteView.as_view(), name='service-detail'),
+    path('users/saloons/<uuid:saloon_id>/services/', ServiceListCreateView.as_view(), name='service-list-create'),
+    path('users/saloons/<uuid:saloon_id>/services/<uuid:pk>/', ServiceDetailUpdateDeleteView.as_view(), name='service-detail'),
+
 
     #################################Staff Details################################################
-    path('users/staff/<uuid:staff_id>', ServiceDetailUpdateDeleteView.StaffDetailUpdateDeleteView.as_view(), name='staff-detail-update-delete'),
-     path('working-days/<uuid:working_day_id>/', WorkingDayDetailUpdateDeleteView.as_view(), name='working-day-detail-update-delete'),
+    path('saloon/<uuid:saloon_id>/staff/', StaffCreateView.as_view(), name='staff-create'),
+    path('users/staff/<uuid:staff_id>', StaffDetailUpdateDeleteView.as_view(), name='staff-detail-update-delete'),
+    path('working-days/<uuid:working_day_id>/', WorkingDayDetailUpdateDeleteView.as_view(), name='working-day-detail-update-delete'),
+
+    #####################################Opening Hours##################################################
+    path('saloon/<uuid:saloon_id>/opening-hours/', OpeningHourListCreateView.as_view(), name='opening-hour-list-create'),
+    path('saloon/<uuid:saloon_id>/opening-hours/<uuid:opening_hour_id>/', OpeningHourDetailUpdateDeleteView.as_view(), name='opening-hour-detail-update-delete'),
+
 ]

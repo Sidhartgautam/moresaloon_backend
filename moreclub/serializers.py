@@ -6,6 +6,7 @@ from services.models import Service, ServiceVariation, ServiceImage, ServiceVari
 from services.serializers import ServiceVariationSerializer
 from appointments.models import Appointment, AppointmentSlot
 from appointments.serializers import AppointmentSlotSerializer
+from openinghours.models import OpeningHour
 
 
 ####################################USER########################################
@@ -35,15 +36,15 @@ class SaloonSerializer(serializers.Serializer):
     instagram_link = serializers.CharField(max_length=255)
     contact_no = serializers.CharField(max_length=255)
 
-
     def get_country_code(self, obj):
-        return obj.country.code 
+        return obj.country.code
 
     def get_currency_code(self, obj):
-        return obj.currency.symbol
+        return obj.currency.currency_code
+        
     def create(self, validated_data):
         saloon = Saloon.objects.create(**validated_data)
-        return Saloon
+        return saloon
     def update(self, instance, validated_data):
         instance.country = validated_data.get('country', instance.country)
         instance.currency = validated_data.get('currency', instance.currency)
@@ -82,8 +83,7 @@ class ServiceVariationSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceVariation
         fields = ['id', 'name', 'description', 'duration', 'price', 'discount_price', 'images']
-
-    def create(self, validated_data):
+def create(self, validated_data):
         images_data = validated_data.pop('images', [])
         variation = ServiceVariation.objects.create(**validated_data)
 
@@ -93,12 +93,20 @@ class ServiceVariationSerializer(serializers.ModelSerializer):
         return variation
 
 class ServiceSerializer(serializers.ModelSerializer):
-    images = ServiceImageSerializer(many=True, required=False)
+    # images = ServiceImageSerializer(many=True, required=False)
+    logo=serializers.SerializerMethodField(read_only=True)
     variations = ServiceVariationSerializer(many=True, required=False)
+    logo=serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Service
-        fields = ['id', 'name', 'description', 'min_duration', 'max_duration', 'images', 'variations']
+        fields = ['id', 'name','logo', 'variations']
+        # 'min_duration', 'max_duration'
+
+    def get_logo(self, obj):
+        if obj.saloon and obj.saloon.logo:
+            return obj.saloon.logo.url
+        return None
 
     def create(self, validated_data):
         images_data = validated_data.pop('images', [])
@@ -131,7 +139,7 @@ class ServiceSerializer(serializers.ModelSerializer):
         instance.max_duration = validated_data.get('max_duration', instance.max_duration)
         instance.save()
 
-        # Update or replace service images
+ # Update or replace service images
         instance.images.all().delete()
         for image_data in images_data:
             ServiceImage.objects.create(service=instance, **image_data)
@@ -149,22 +157,42 @@ class ServiceSerializer(serializers.ModelSerializer):
         return instance
     
 ########################################################Staffs##########################################################################
-class StaffSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Staff
-        fields = ['id', 'saloon', 'name', 'email', 'contact_no', 'image']
-    
-    def create(self, validated_data):
-        staff = Staff.objects.create(**validated_data)
-        return staff
-    
 class WorkingDaySerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkingDay
-        fields = ['id', 'staff', 'day_of_week', 'start_time', 'end_time', 'break_times']
+        fields = ['id', 'staff', 'day_of_week', 'start_time', 'end_time']
     def create(self, validated_data):
         working_day = WorkingDay.objects.create(**validated_data)
         return working_day
+
+
+class StaffSerializer(serializers.ModelSerializer):
+    working_days = WorkingDaySerializer(many=True, required=False) 
+
+    class Meta:
+        model = Staff
+        fields = ['id', 'saloon', 'name', 'email', 'contact_no', 'image', 'working_days'] 
+
+    def create(self, validated_data):
+        working_days_data = validated_data.pop('working_days', [])
+        staff = Staff.objects.create(**validated_data)
+        for working_day_data in working_days_data:
+            WorkingDay.objects.create(staff=staff, **working_day_data)
+
+        return staff
+
+    def update(self, instance, validated_data):
+        working_days_data = validated_data.pop('working_days', [])
+        instance.name = validated_data.get('name', instance.name)
+        instance.email = validated_data.get('email', instance.email)
+        instance.contact_no = validated_data.get('contact_no', instance.contact_no)
+        instance.image = validated_data.get('image', instance.image)
+        instance.save()
+        instance.working_days.all().delete()  # Assuming a Staff has a `related_name="workingday_set"` for working days
+        for working_day_data in working_days_data:
+            WorkingDay.objects.create(staff=instance, **working_day_data)
+
+        return instance
     
 
 #################################################Appointments and Appointment Slots##################################################
@@ -176,7 +204,15 @@ class AppointmentSlotSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         appointment_slot = AppointmentSlot.objects.create(**validated_data)
         return appointment_slot
-        
-
-
     
+
+
+    ###########################################Opening Hours############################################################
+class OpeningHourSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OpeningHour
+        fields = ['id', 'saloon', 'day', 'opening_time', 'closing_time']
+
+    def create(self, validated_data):
+        opening_hour = OpeningHour.objects.create(**validated_data)
+        return opening_hour

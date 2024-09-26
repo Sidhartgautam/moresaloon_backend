@@ -71,6 +71,15 @@ class ServiceVariation(models.Model):
             return self.price
         return None
     
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.service.update_durations() 
+
+    def delete(self, *args, **kwargs):
+        service = self.service
+        super().delete(*args, **kwargs)
+        service.update_durations()
+    
 class ServiceVariationImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     variation = models.ForeignKey(ServiceVariation, related_name='images', on_delete=models.CASCADE)

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import  Service, ServiceImage, ServiceVariation,ServiceVariationImage
 from saloons.models import Saloon
+from datetime import timedelta
 
 
 class ServiceVariationSerializer(serializers.ModelSerializer):
@@ -103,10 +104,26 @@ class ServiceSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     description = serializers.CharField()
     variations = NestedServiceVariationSerializer(many=True, read_only=True)
+    min_duration = serializers.SerializerMethodField()
+    max_duration = serializers.SerializerMethodField()
     # appointments_count= serializers.IntegerField(read_only=True)
     class Meta:
         model = Service
         fields = ['id','name', 'description','variations', 'min_duration', 'max_duration', 'image','slug']
+
+    def get_min_duration(self, obj):
+        durations = [variation.duration for variation in obj.variations.all() if variation.duration != "00:00:00"]
+        if durations:
+            min_duration = min([timedelta(hours=int(d[:2]), minutes=int(d[3:5])) for d in durations])
+            return str(min_duration)
+        return None
+
+    def get_max_duration(self, obj):
+        durations = [variation.duration for variation in obj.variations.all() if variation.duration != "00:00:00"]
+        if durations:
+            max_duration = max([timedelta(hours=int(d[:2]), minutes=int(d[3:5])) for d in durations])
+            return str(max_duration)
+        return None
 
     def get_image(self, obj):
         image = ServiceImage.objects.filter(service=obj).first()
