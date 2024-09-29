@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "corsheaders",
     'django_celery_beat',
+    'taggit',
 
     # Custom apps
     'users',
@@ -113,11 +114,14 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql', 
+        'NAME': 'moresaloon4',              
+        'USER': 'moresaloon4',                
+        'PASSWORD': 'NY48FX7f6Xde',     
+        'HOST': '100.42.187.204',            
+        'PORT': '5432',                            
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators

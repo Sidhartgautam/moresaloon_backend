@@ -1,7 +1,9 @@
 from rest_framework import serializers
-from saloons.models import Saloon,Gallery,Amenities
+from saloons.models import Saloon,Gallery
 from review.serializers import ReviewSerializer
 from datetime import datetime
+from timezonefinder import TimezoneFinder
+import pytz
 from openinghours.models import OpeningHour
 class SaloonSerializer(serializers.ModelSerializer):
     logo = serializers.ImageField(required=False)  
@@ -16,16 +18,23 @@ class SaloonSerializer(serializers.ModelSerializer):
     def get_logo(self, obj):
         return obj.logo.url if obj.logo else None 
     def get_is_open(self, obj):
-        current_time=datetime.now().time()
-        current_day=datetime.now().strftime('%A')
-        try:
-            opening_hours = OpeningHour.objects.filter(saloon=obj, day_of_week=current_day).first()
+        if not obj.is_open:
+            return False
+        tf = TimezoneFinder()
+        timezone_str = tf.timezone_at(lat=self.lat, lng=self.lng)
+        if not timezone_str:
+            raise ValueError("Could not determine timezone for the saloon location")
 
-            if opening_hours and opening_hours.start_time <= current_time <= opening_hours.end_time:
-                return "Open"
-            return "Closed"
-        except OpeningHour.DoesNotExist:
-            return "Closed"
+        local_timezone = pytz.timezone(timezone_str)
+        local_now = datetime.now(local_timezone)
+        current_day = local_now.strftime('%A')
+
+        opening_hours = OpeningHour.objects.filter(day__day_name=current_day).first()
+
+        if not opening_hours or not opening_hours.is_open:
+            return False
+
+        return opening_hours.from_time <= local_now.time() <= opening_hours.to_time
     
     
 class GallerySerializer(serializers.ModelSerializer):
@@ -48,30 +57,35 @@ class SaloonDetailSerializer(serializers.ModelSerializer):
     # banner = serializers.ImageField(required=False)
     # reviews = ReviewSerializer(many=True, read_only=True)
     is_open=serializers.SerializerMethodField()
+    amenities = serializers.SerializerMethodField()
     class Meta:
         model = Saloon
-        fields = ['id','name','logo','short_description','long_description','address','banner','email','contact_no','website_link','facebook_link','instagram_link','lat','lng','is_open']
+        fields = ['id','name','logo','short_description','long_description','address','banner','email','contact_no','website_link','facebook_link','instagram_link','lat','lng','is_open','amenities']
 
         depth = 1
+
+    def get_amenities(self, obj):
+        return obj.amenities.all()
 
     def get_logo(self, obj):
         return obj.logo.url if obj.logo else None 
     def get_is_open(self, obj):
-        current_time=datetime.now().time()
-        current_day=datetime.now().strftime('%A')
-        try:
-            opening_hours = OpeningHour.objects.filter(saloon=obj, day_of_week=current_day).first()
+        if not obj.is_open:
+            return False
+        tf = TimezoneFinder()
+        timezone_str = tf.timezone_at(lat=self.lat, lng=self.lng)
+        if not timezone_str:
+            raise ValueError("Could not determine timezone for the saloon location")
 
-            if opening_hours and opening_hours.start_time <= current_time <= opening_hours.end_time:
-                return "Open"
-            return "Closed"
-        except OpeningHour.DoesNotExist:
-            return "Closed"
-    
-class AmenitiesSerializer(serializers.ModelSerializer):
-    saloon =serializers.PrimaryKeyRelatedField(queryset=Saloon.objects.all(),required=True)
-    class Meta:
-        model = Amenities
-        fields = ['id','saloon','name']
+        local_timezone = pytz.timezone(timezone_str)
+        local_now = datetime.now(local_timezone)
+        current_day = local_now.strftime('%A')
+
+        opening_hours = OpeningHour.objects.filter(day__day_name=current_day).first()
+
+        if not opening_hours or not opening_hours.is_open:
+            return False
+
+        return opening_hours.from_time <= local_now.time() <= opening_hours.to_time
  
         

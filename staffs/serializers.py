@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from services.models import Service
 from .models import Staff, WorkingDay, BreakTime
 from saloons.models import Saloon
 
@@ -13,11 +14,18 @@ class WorkingDaySerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkingDay
         fields = ['day_of_week', 'start_time', 'end_time', 'break_times']
+    
+    def validate(self, data):
+        if data['start_time'] >= data['end_time']:
+            raise serializers.ValidationError('Start time must be before end time.')
+        return data
+    
+    
 
 class StaffSerializer(serializers.ModelSerializer):
-    # working_days = WorkingDaySerializer(many=True, required=False)
     saloon = serializers.PrimaryKeyRelatedField(queryset=Saloon.objects.all())
     image = serializers.SerializerMethodField()
+    services = serializers.PrimaryKeyRelatedField(many=True, queryset=Service.objects.all())
 
     class Meta:
         model = Staff

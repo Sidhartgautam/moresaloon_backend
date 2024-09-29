@@ -1,5 +1,5 @@
 from django.db.models import Q, Count,Avg,OuterRef, Subquery
-from saloons.models import Saloon,Amenities
+from saloons.models import Saloon
 from services.models import Service, ServiceVariation
 from staffs.models import Staff
 from appointments.models import Appointment

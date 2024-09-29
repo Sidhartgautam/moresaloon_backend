@@ -2,8 +2,8 @@ from math import radians, cos, sin, asin, sqrt
 from rest_framework.views import APIView
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
-from .models import Saloon,Gallery,Amenities
-from .serializers import SaloonSerializer, GallerySerializer,PopularSaloonSerializer,SaloonDetailSerializer,AmenitiesSerializer
+from .models import Saloon,Gallery
+from .serializers import SaloonSerializer, GallerySerializer,PopularSaloonSerializer,SaloonDetailSerializer
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.response import PrepareResponse
 from django.db.models import Count, Q
@@ -244,40 +244,40 @@ class PopularSaloonListView(generics.GenericAPIView):
 
 
     
-class AmenitiesListView(generics.GenericAPIView):
-    serializer_class = AmenitiesSerializer
-    # permission_classes = [IsAuthenticated]
+# class AmenitiesListView(generics.GenericAPIView):
+#     serializer_class = AmenitiesSerializer
+#     # permission_classes = [IsAuthenticated]
 
-    def get(self, request, *args, **kwargs):
-        saloon_id = self.kwargs.get('saloon_id')
-        queryset = Amenities.objects.filter(saloon_id=saloon_id)
-        serializer = self.get_serializer(queryset, many=True)
-        response = PrepareResponse(
-            success=True,
-            data=serializer.data,
-            message="Amenities fetched successfully"
-        )
-        return response.send(200)
+#     def get(self, request, *args, **kwargs):
+#         saloon_id = self.kwargs.get('saloon_id')
+#         queryset = Amenities.objects.filter(saloon_id=saloon_id)
+#         serializer = self.get_serializer(queryset, many=True)
+#         response = PrepareResponse(
+#             success=True,
+#             data=serializer.data,
+#             message="Amenities fetched successfully"
+#         )
+#         return response.send(200)
     
-class AmenitiesCreateView(generics.GenericAPIView):
-    serializer_class = AmenitiesSerializer
-    # permission_classes = [IsAuthenticated]
+# class AmenitiesCreateView(generics.GenericAPIView):
+#     serializer_class = AmenitiesSerializer
+#     # permission_classes = [IsAuthenticated]
 
-    def post(self, request, *args, **kwargs):
-        data = request.data.copy()
-        data.update(request.FILES)
-        serializer = self.get_serializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            response = PrepareResponse(
-                success=True,
-                data=serializer.data,
-                message="Amenity created successfully"
-            )
-            return response.send(201)
-        response = PrepareResponse(
-            success=False,
-            data=serializer.errors,
-            message="Amenity creation failed"
-        )
-        return response.send(400)
+#     def post(self, request, *args, **kwargs):
+#         data = request.data.copy()
+#         data.update(request.FILES)
+#         serializer = self.get_serializer(data=data)
+#         if serializer.is_valid():
+#             serializer.save()
+#             response = PrepareResponse(
+#                 success=True,
+#                 data=serializer.data,
+#                 message="Amenity created successfully"
+#             )
+#             return response.send(201)
+#         response = PrepareResponse(
+#             success=False,
+#             data=serializer.errors,
+#             message="Amenity creation failed"
+#         )
+#         return response.send(400)

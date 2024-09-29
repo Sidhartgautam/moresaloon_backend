@@ -1,11 +1,17 @@
 from rest_framework import serializers
-from saloons.models import Saloon
+from saloons.models import Saloon,Gallery
 from country.models import Country,Currency
 from staffs.models import Staff, WorkingDay
 from services.models import Service, ServiceVariation, ServiceImage, ServiceVariationImage
 from services.serializers import ServiceVariationSerializer
 from appointments.models import Appointment, AppointmentSlot
 from appointments.serializers import AppointmentSlotSerializer
+from openinghours.models import OpeningHour
+from core.utils.response import PrepareResponse
+from datetime import datetime, timedelta
+
+import uuid
+from django.core.exceptions import ValidationError
 
 
 ####################################USER########################################
@@ -15,52 +21,72 @@ class UserNameSerializer(serializers.Serializer):
 
 
 ####################################SALOON########################################
-class SaloonSerializer(serializers.Serializer):
-    id=serializers.UUIDField(read_only=True)
-    country_code= serializers.SerializerMethodField(read_only=True)
+class SaloonSerializer(serializers.ModelSerializer):
+    # We can add read-only fields for country and currency codes if needed
+    country_code = serializers.SerializerMethodField(read_only=True)
     currency_code = serializers.SerializerMethodField(read_only=True)
-    country = serializers.PrimaryKeyRelatedField(queryset=Country.objects.all())
-    currency=serializers.PrimaryKeyRelatedField(queryset=Currency.objects.all())
-    name = serializers.CharField(max_length=255)
-    address = serializers.CharField(max_length=255)
-    short_description = serializers.CharField(max_length=255)
-    long_description = serializers.CharField(max_length=255)
-    lat = serializers.FloatField()
-    lng = serializers.FloatField()
-    email = serializers.EmailField()
-    logo = serializers.ImageField()
-    banner = serializers.ImageField()
-    website_link = serializers.CharField(max_length=255)
-    facebook_link = serializers.CharField(max_length=255)
-    instagram_link = serializers.CharField(max_length=255)
-    contact_no = serializers.CharField(max_length=255)
 
+    # Define amenities as a ListField of CharField to handle list input
+    amenities = serializers.ListField(
+        child=serializers.CharField(),
+        required=False
+    )
 
+    class Meta:
+        model = Saloon
+        fields = [
+            'id', 'name', 'address', 'email', 'contact_no', 'country', 'currency', 'lat', 'lng',
+            'short_description', 'long_description', 'website_link', 'facebook_link',
+            'instagram_link', 'logo', 'banner', 'amenities', 'country_code', 'currency_code'
+        ]
+    
     def get_country_code(self, obj):
-        return obj.country.code 
+        return obj.country.code
 
     def get_currency_code(self, obj):
-        return obj.currency.symbol
+        return obj.currency.currency_code
+
     def create(self, validated_data):
+        
         saloon = Saloon.objects.create(**validated_data)
-        return Saloon
+        return saloon
+
     def update(self, instance, validated_data):
-        instance.country = validated_data.get('country', instance.country)
-        instance.currency = validated_data.get('currency', instance.currency)
+        # Update the saloon instance with new data
         instance.name = validated_data.get('name', instance.name)
         instance.address = validated_data.get('address', instance.address)
-        instance.short_description = validated_data.get('short_description', instance.short_description)
-        instance.long_description = validated_data.get('long_description', instance.long_description)
-        instance.lat = validated_data.get('lat', instance.lat)
-        instance.lng = validated_data.get('lng', instance.lng)
         instance.email = validated_data.get('email', instance.email)
         instance.contact_no = validated_data.get('contact_no', instance.contact_no)
-        instance.logo = validated_data.get('logo', instance.logo)
-        instance.banner = validated_data.get('banner', instance.banner)
+        instance.country = validated_data.get('country', instance.country)
+        instance.currency = validated_data.get('currency', instance.currency)
+        instance.lat = validated_data.get('lat', instance.lat)
+        instance.lng = validated_data.get('lng', instance.lng)
+        instance.short_description = validated_data.get('short_description', instance.short_description)
+        instance.long_description = validated_data.get('long_description', instance.long_description)
         instance.website_link = validated_data.get('website_link', instance.website_link)
         instance.facebook_link = validated_data.get('facebook_link', instance.facebook_link)
         instance.instagram_link = validated_data.get('instagram_link', instance.instagram_link)
+
+        # Update amenities if provided
+        if 'amenities' in validated_data:
+            instance.amenities = validated_data.get('amenities', instance.amenities)
         
+        # Save the updated instance
+        instance.save()
+        return instance
+    
+
+###################################Gallery#######################################
+class SaloonGallerySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Gallery
+        fields = ['id', 'image']
+
+    def create(self, validated_data):
+        gallery = Gallery.objects.create(**validated_data)
+        return gallery
+    def update(self, instance, validated_data):
+        instance.image = validated_data.get('image', instance.image)
         instance.save()
         return instance
     
@@ -77,28 +103,43 @@ class ServiceVariationImageSerializer(serializers.ModelSerializer):
         fields = ['id', 'image']
 
 class ServiceVariationSerializer(serializers.ModelSerializer):
-    images = ServiceVariationImageSerializer(many=True, required=False)
+    images = ServiceVariationImageSerializer(many=True, read_only=True)
+
+    currency= serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ServiceVariation
-        fields = ['id', 'name', 'description', 'duration', 'price', 'discount_price', 'images']
+        fields = ['id', 'name', 'description', 'duration', 'price', 'discount_price', 'images','currency']
 
+    def get_currency(self, obj):
+        return obj.service.saloon.currency.symbol
     def create(self, validated_data):
-        images_data = validated_data.pop('images', [])
         variation = ServiceVariation.objects.create(**validated_data)
 
-        for image_data in images_data:
-            ServiceVariationImage.objects.create(variation=variation, **image_data)
-
         return variation
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get('name', instance.name)
+        instance.description = validated_data.get('description', instance.description)
+        instance.duration = validated_data.get('duration', instance.duration)
+        instance.price = validated_data.get('price', instance.price)
+        instance.discount_price = validated_data.get('discount_price', instance.discount_price)
+        instance.save()
+        return instance
 
 class ServiceSerializer(serializers.ModelSerializer):
-    images = ServiceImageSerializer(many=True, required=False)
+    # images = ServiceImageSerializer(many=True, required=False)
+    logo=serializers.SerializerMethodField(read_only=True)
     variations = ServiceVariationSerializer(many=True, required=False)
+    logo=serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Service
-        fields = ['id', 'name', 'description', 'min_duration', 'max_duration', 'images', 'variations']
+        fields = ['id', 'name','logo', 'variations']
+
+    def get_logo(self, obj):
+        if obj.saloon and obj.saloon.logo:
+            return obj.saloon.logo.url
+        return None
 
     def create(self, validated_data):
         images_data = validated_data.pop('images', [])
@@ -130,53 +171,178 @@ class ServiceSerializer(serializers.ModelSerializer):
         instance.min_duration = validated_data.get('min_duration', instance.min_duration)
         instance.max_duration = validated_data.get('max_duration', instance.max_duration)
         instance.save()
-
-        # Update or replace service images
         instance.images.all().delete()
         for image_data in images_data:
             ServiceImage.objects.create(service=instance, **image_data)
-
-        # Update or replace service variations
         instance.variations.all().delete()
         for variation_data in variations_data:
             images = variation_data.pop('images', [])
             variation = ServiceVariation.objects.create(service=instance, **variation_data)
-
-            # Update variation images
             for image_data in images:
                 ServiceVariationImage.objects.create(variation=variation, **image_data)
 
         return instance
     
 ########################################################Staffs##########################################################################
-class StaffSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Staff
-        fields = ['id', 'saloon', 'name', 'email', 'contact_no', 'image']
-    
-    def create(self, validated_data):
-        staff = Staff.objects.create(**validated_data)
-        return staff
-    
 class WorkingDaySerializer(serializers.ModelSerializer):
+
     class Meta:
         model = WorkingDay
-        fields = ['id', 'staff', 'day_of_week', 'start_time', 'end_time', 'break_times']
+        fields = ['id','day_of_week', 'start_time', 'end_time']
+
     def create(self, validated_data):
         working_day = WorkingDay.objects.create(**validated_data)
+        print(validated_data)
         return working_day
-    
+
+    def update(self, instance, validated_data):
+        instance.staff = validated_data.get('staff', instance.staff)
+        instance.day_of_week = validated_data.get('day_of_week', instance.day_of_week)
+        instance.start_time = validated_data.get('start_time', instance.start_time)
+        instance.end_time = validated_data.get('end_time', instance.end_time)
+        instance.save()
+        return instance
+
+class ServicesInfoSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+
+class StaffSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(required=True)
+    contact_no = serializers.CharField(max_length=255, required=True)
+    image = serializers.ImageField(required=False)
+    services = ServicesInfoSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Staff
+        fields = ['id', 'saloon', 'services', 'name', 'email', 'contact_no', 'image']
+
+    def create(self, validated_data):
+        # Create the Staff object
+        staff = Staff.objects.create(**validated_data)
+
+        return staff
+
+    def update(self, instance, validated_data):
+        services_data = validated_data.pop('services', None)
+        instance.name = validated_data.get('name', instance.name)
+        instance.email = validated_data.get('email', instance.email)
+        instance.contact_no = validated_data.get('contact_no', instance.contact_no)
+        instance.image = validated_data.get('image', instance.image)
+        instance.save()
+        if services_data is not None:
+            instance.services.set(services_data)
+
+        return instance
 
 #################################################Appointments and Appointment Slots##################################################
-class AppointmentSlotSerializer(serializers.ModelSerializer):
+class AppointmentSlotByStaffSerializer(serializers.ModelSerializer):
+    end_time = serializers.TimeField(read_only=True)
+    date = serializers.SerializerMethodField()
+
     class Meta:
         model = AppointmentSlot
-        fields = ['id', 'saloon', 'date', 'slots']
+        fields = ['id', 'saloon', 'staff', 'start_time', 'service_variation', 'end_time', 'date', 'buffer_time']
+
+    def get_date(self, obj):
+        # Assuming the `WorkingDay` has a `date` field or use a relevant field
+        if obj.working_day:
+            return obj.working_day.date.strftime("%Y-%m-%d")
+        return None
+
+    def validate(self, data):
+        staff = data.get('staff')
+        start_time = data.get('start_time')
+        service_variation = data.get('service_variation')
+        buffer_time = data.get('buffer_time', timedelta(minutes=10))
+
+        if not staff or not start_time or not service_variation:
+            raise serializers.ValidationError("Staff, start time, and service variation are required.")
+
+        if not staff.services.filter(id=service_variation.service.id).exists():
+            raise serializers.ValidationError("The selected staff member does not provide this service.")
+
+        service_duration = service_variation.duration
+        start_datetime = datetime.combine(datetime.today(), start_time)
+        end_datetime = start_datetime + service_duration + (buffer_time or timedelta())
+        data['end_time'] = end_datetime.time()
+        overlapping_slots = AppointmentSlot.objects.filter(
+            staff=staff,
+            working_day=data.get('working_day'),
+            start_time__lt=data['end_time'],
+            end_time__gt=start_time
+        ).exclude(pk=self.instance.pk if self.instance else None)
+
+        if overlapping_slots.exists():
+            raise serializers.ValidationError("This time slot overlaps with another slot for this staff member.")
+
+        return data
     
     def create(self, validated_data):
         appointment_slot = AppointmentSlot.objects.create(**validated_data)
         return appointment_slot
-        
 
-
+    def update(self, instance, validated_data):
+        instance.start_time = validated_data.get('start_time', instance.start_time)
+        instance.end_time = validated_data.get('end_time', instance.end_time)
+        instance.save()
+        return instance
     
+    
+
+
+    ###########################################Opening Hours############################################################
+
+class OpeningHourSerializer(serializers.ModelSerializer):
+    start_time = serializers.TimeField(required=False)
+    end_time = serializers.TimeField(required=False)
+    day_of_week = serializers.CharField(required=False)
+    class Meta:
+        model = OpeningHour
+        fields = ('day_of_week', 'start_time', 'end_time', 'is_open')
+
+    def create(self, validated_data):
+        opening_hour = OpeningHour.objects.create(**validated_data)
+        return opening_hour
+
+    def update(self, instance, validated_data):
+        instance.start_time = validated_data.get('start_time', instance.start_time)
+        instance.end_time = validated_data.get('end_time', instance.end_time)
+        instance.day_of_week = validated_data.get('day_of_week', instance.day_of_week)
+        instance.is_open = validated_data.get('is_open', instance.is_open)
+        instance.save()
+        return instance
+    
+    
+##################################################Appointments####################################################################
+
+class AppointmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Appointment
+        fields = ['id', 'saloon', 'staff', 'service', 'service_variation', 'start_time', 'end_time', 'status','date']
+
+    def create(self, validated_data):
+        appointment = Appointment.objects.create(**validated_data)
+        return appointment
+
+    def update(self, instance, validated_data):
+        instance.start_time = validated_data.get('start_time', instance.start_time)
+        instance.end_time = validated_data.get('end_time', instance.end_time)
+        instance.status = validated_data.get('status', instance.status)
+        instance.save()
+        return instance
+
+##########################################StaffAvailability####################################################################
+class StaffAvailabilitySerializer(serializers.Serializer):
+    staff_id = serializers.UUIDField(required=True)
+    appointment_date = serializers.DateField(required=True)
+    start_time = serializers.TimeField(required=True)
+    end_time = serializers.TimeField(required=True)
+
+    def update(self, instance, validated_data):
+        instance.staff = validated_data.get('staff', instance.staff)
+        instance.day_of_week = validated_data.get('day_of_week', instance.day_of_week)
+        instance.start_time = validated_data.get('start_time', instance.start_time)
+        instance.end_time = validated_data.get('end_time', instance.end_time)
+        instance.save()
+        return instance
