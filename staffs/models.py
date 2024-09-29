@@ -1,11 +1,11 @@
 from django.db import models
 from saloons.models import Saloon
 from services.models import Service
-# import uuid
+import uuid
 # from django.contrib.auth.models import User
 
 class Staff(models.Model):
-    # id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     # user = models.ForeignKey('users.User', on_delete=models.CASCADE)
     saloon = models.ForeignKey(Saloon, related_name='staffs', on_delete=models.CASCADE,null=True)
     name = models.CharField(max_length=255)
@@ -18,6 +18,7 @@ class Staff(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.saloon.name if self.saloon else 'No Saloon'}"
+
 
 class WorkingDay(models.Model):
     staff = models.ForeignKey(Staff, related_name='working_days', on_delete=models.CASCADE)
@@ -35,6 +36,9 @@ class WorkingDay(models.Model):
 
     def __str__(self):
         return f"{self.staff.name} - {self.day_of_week}-{self.start_time} to {self.end_time}"
+    
+    class Meta:
+        unique_together = ('staff', 'day_of_week')
 
 class BreakTime(models.Model):
     working_day = models.ForeignKey(WorkingDay, related_name='break_times', on_delete=models.CASCADE)

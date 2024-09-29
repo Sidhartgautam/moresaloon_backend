@@ -1,38 +1,68 @@
 from rest_framework import generics
 from rest_framework.views import APIView
-from saloons.models import Saloon
-from services.models import Service
+from saloons.models import Saloon,Gallery
+from appointments.models import AppointmentSlot
+from services.models import Service,ServiceVariation, ServiceVariationImage
 from openinghours.models import OpeningHour
 from staffs.models import Staff,WorkingDay
-from moreclub.serializers import SaloonSerializer,ServiceSerializer,StaffSerializer,OpeningHourSerializer,WorkingDaySerializer
+from moreclub.serializers import (ServiceVariationImageSerializer,
+                                   SaloonSerializer,
+                                   ServiceSerializer,
+                                   StaffSerializer,
+                                   OpeningHourSerializer,
+                                   WorkingDaySerializer,
+                                   ServiceVariationSerializer,
+                                   AppointmentSlotByStaffSerializer,
+                                   SaloonGallerySerializer)
 from core.utils.response import PrepareResponse
 from rest_framework.permissions import IsAuthenticated
 from core.utils.auth import SaloonPermissionMixin
 from core.utils.permissions import IsSaloonPermission
 from django.shortcuts import get_object_or_404
+from django.db import transaction
+from datetime import datetime
+from rest_framework.parsers import MultiPartParser
 
 
 
 ##############Saloon###################################
-class SaloonSetupView(SaloonPermissionMixin, generics.GenericAPIView):
-    serializer_class =SaloonSerializer
-
-    def post(self, request, *args, **kwargs):
-        serializer=self.get_serializer(data=request.data)
+class SaloonSetupView(SaloonPermissionMixin, generics.ListCreateAPIView):
+    serializer_class = SaloonSerializer
+    queryset = Saloon.objects.all()  # Define the queryset for listing
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        
         if serializer.is_valid():
-            serializer.save(user=request.user)
-            response=PrepareResponse(
+            saloon = serializer.save(user=request.user)
+            
+            amenities = request.data.getlist('amenities[]')
+            saloon.amenities = amenities
+            saloon.save()
+            saloon_detail = self.get_serializer(saloon).data
+
+           
+            return PrepareResponse(
                 success=True,
-                data=serializer.data,
+                data=saloon_detail,
                 message="Saloon created successfully"
-            )
-            return response.send(201)
-        response = PrepareResponse(
+            ).send(201)
+
+        return PrepareResponse(
             success=False,
             data=serializer.errors,
             message="Failed to create saloon"
-        )
-        return response.send(400)
+        ).send(400)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+
+        return PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message="List of saloons retrieved successfully"
+        ).send(200)
 
 class SaloonDetailUpdateView(SaloonPermissionMixin, generics.RetrieveUpdateAPIView):
     serializer_class = SaloonSerializer
@@ -92,7 +122,173 @@ class UserSaloonListView(SaloonPermissionMixin, generics.GenericAPIView):
         )
         return response.send(200)
     
-################################################Service###########################################################
+################################################ServiceVariations###########################################################
+
+class ServiceVariationListCreateView(generics.GenericAPIView):
+    serializer_class = ServiceVariationSerializer
+    permission_classes = [IsAuthenticated, IsSaloonPermission]
+
+    def get_queryset(self):
+        saloon_id = self.kwargs.get('saloon_id')
+        service_id = self.kwargs.get('service_id')
+        
+        # Use the related service to filter by saloon
+        return ServiceVariation.objects.filter(
+            service__saloon_id=saloon_id,
+            service__saloon__user=self.request.user,
+            service_id=service_id
+        )
+
+    def get(self, request, *args, **kwargs):
+        service_variations = self.get_queryset()
+        page = self.paginate_queryset(service_variations)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(service_variations, many=True)
+        response = PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message="Service variations retrieved successfully"
+        )
+        return response.send(200)
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        saloon_id = self.kwargs.get('saloon_id')
+        service_id = self.kwargs.get('service_id')
+
+        try:
+            service = Service.objects.get(id=service_id, saloon__user=request.user)
+        except Service.DoesNotExist:
+            response = PrepareResponse(
+                success=False,
+                data={},
+                message="Service not found or you do not have permission to add variations to this service"
+            )
+            return response.send(403)
+
+        if serializer.is_valid():
+            service_var = serializer.save(service=service)
+
+            images = request.FILES.getlist('images[]')
+            if not images:
+                response = PrepareResponse(
+                    success=False,
+                    data=serializer.data,
+                    errors={'non_field_errors': ['Please upload at least one image']},
+                )
+                return response.send(400)
+
+            serializer_data = []
+            for image in images:
+                serializer_service_var_image = ServiceVariationImageSerializer(data={'variation': service_var.id, 'image': image})
+                if serializer_service_var_image.is_valid():
+                    serializer_service_var_image.save(variation_id=service_var.id)
+                    serializer_data.append(serializer_service_var_image.data)
+                else:
+                    response = PrepareResponse(
+                        success=False,
+                        data=serializer_data,
+                        errors=serializer_service_var_image.errors
+                    )
+                    return response.send(400)
+            response = PrepareResponse(
+                success=True,
+                data=serializer.data,
+                message="Service variation created successfully"
+            )
+            return response.send(201)
+        else:
+            response = PrepareResponse(
+                success=False,
+                data=serializer.errors,
+                message="Failed to create service variation"
+            )
+            return response.send(400)
+        
+class ServiceVariationDetailUpdateView(generics.RetrieveUpdateAPIView):
+    serializer_class = ServiceVariationSerializer
+    permission_classes = [IsAuthenticated, IsSaloonPermission]
+
+    def get_object(self):
+        service_variation = get_object_or_404(ServiceVariation, pk=self.kwargs['service_variation_id'])
+        if service_variation.service.saloon.user != self.request.user:
+            response = PrepareResponse(
+                success=False,
+                message='You are not authorized to perform this action on this service variation'
+            )
+            return response.send(403)
+        return service_variation
+    def get(self, request, *args, **kwargs):
+        service_variation = self.get_object()
+        if isinstance(service_variation, PrepareResponse):
+            return service_variation
+        serializer = self.get_serializer(service_variation)
+        response = PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message='Service variation fetched successfully'
+        )
+        return response.send(200)
+
+    def patch(self, request, *args, **kwargs):
+        service_variation = self.get_object()
+        if isinstance(service_variation, PrepareResponse):
+            return service_variation
+        serializer = self.get_serializer(service_variation, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            images = request.FILES.getlist('images[]')
+            remove_images = request.data.getlist('removed_images[]')
+
+            for image in remove_images:
+                try:
+                    service_variation_image = ServiceVariationImage.objects.get(id=image)
+                    service_variation_image.delete()
+                except:
+                    pass
+
+            serializer_data = []
+            for image in images:
+                serializer_service_var_image = ServiceVariationImageSerializer(data={'variation': service_variation.id, 'image': image})
+                if serializer_service_var_image.is_valid():
+                    serializer_service_var_image.save(variation_id=service_variation.id)
+                    serializer_data.append(serializer_service_var_image.data)
+                else:
+                    response = PrepareResponse(
+                        success=False,
+                        data=serializer_data,
+                        errors=serializer_service_var_image.errors
+                    )
+                    return response.send(400)
+            
+            response = PrepareResponse(
+                success=True,
+                data=serializer.data,
+                message='Service variation updated successfully'
+            )
+            return response.send(200)
+
+        response = PrepareResponse(
+            success=False,
+            errors=serializer.errors,
+            message='Error updating service variation'
+        )
+        return response.send(400)
+    def delete(self, request, *args, **kwargs):
+        service_variation = self.get_object()
+        if isinstance(service_variation, PrepareResponse):
+            return service_variation
+        service_variation.delete()
+        response = PrepareResponse(
+            success=True,
+            data={},
+            message='Service variation deleted successfully'
+        )
+        return response.send(200)
+#########################################################Service####################################################################        
 class ServiceListCreateView(generics.GenericAPIView):
     serializer_class = ServiceSerializer
     permission_classes = [IsAuthenticated, IsSaloonPermission]
@@ -204,7 +400,7 @@ class StaffCreateView(generics.GenericAPIView):
 
     def get_queryset(self):
         saloon_id = self.kwargs.get('saloon_id')
-        return Staff.objects.filter(saloon_id=saloon_id, saloon__user=self.request.user)
+        return Staff.objects.filter(saloon_id=saloon_id)
 
     def get(self, request, *args, **kwargs):
         staff = self.get_queryset()
@@ -217,27 +413,23 @@ class StaffCreateView(generics.GenericAPIView):
         return response.send(200)
 
     def post(self, request, *args, **kwargs):
-        staff_serializer = self.get_serializer(data=request.data)   
+        saloon_id = self.kwargs.get('saloon_id')
+        saloon = get_object_or_404(Saloon, id=saloon_id) 
+
+        staff_serializer = self.get_serializer(data=request.data)
         if staff_serializer.is_valid():
-            staff = staff_serializer.save()
-            working_days_data = request.data.get('working_days', [])
-            for working_day_data in working_days_data:
-                working_day_data['staff'] = staff.id
-                working_day_serializer = WorkingDaySerializer(data=working_day_data)
-                if working_day_serializer.is_valid():
-                    working_day_serializer.save()
-                else:
-                    response = PrepareResponse(
-                        success=False,
-                        data=working_day_serializer.errors,
-                        message="Failed to create working days"
-                    )
-                    return response.send(400)
+            staff = staff_serializer.save(saloon=saloon)
+            services = request.data.getlist('services[]')
+
+            staff_detail = Staff.objects.get(id=staff.id)
+
+
+            staff_detail.services.set(services)
 
             response = PrepareResponse(
                 success=True,
                 data=staff_serializer.data,
-                message="Staff created successfully with working days"
+                message="Staff created successfully"
             )
             return response.send(201)
 
@@ -253,10 +445,12 @@ class StaffDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsSaloonPermission]
 
     def get_object(self):
-        staff = get_object_or_404(Staff, pk=self.kwargs['staff_id'], saloon__user=self.request.user)
+        staff_id = self.kwargs['staff_id'] 
+        staff = get_object_or_404(Staff, pk=staff_id)
         return staff
 
     def get(self, request, *args, **kwargs):
+        saloon_id = self.kwargs.get('saloon_id')
         staff = self.get_object()
         serializer = self.get_serializer(staff)
         response = PrepareResponse(
@@ -293,13 +487,202 @@ class StaffDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
             message="Staff deleted successfully"
         )
         return response.send(200)
+    
+
+###########################################################staffAvailability########################################
+class AppointmentSlotListCreateView(SaloonPermissionMixin, generics.ListCreateAPIView):
+    serializer_class = AppointmentSlotByStaffSerializer
+    permission_classes = [IsAuthenticated, IsSaloonPermission]
+
+    def get_queryset(self):
+        saloon_id = self.kwargs.get('saloon_id')
+        staff_id = self.kwargs.get('staff_id')
+        return AppointmentSlot.objects.filter(saloon__id=saloon_id, staff__id=staff_id)
+
+    def create(self, request, *args, **kwargs):
+        saloon_id = self.kwargs.get('saloon_id')
+        staff_id = self.kwargs.get('staff_id')
+
+        saloon = get_object_or_404(Saloon, id=saloon_id)
+        staff = get_object_or_404(Staff, id=staff_id, saloon=saloon)
+
+        # Ensure that the user creating the slot is the saloon owner
+        if saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message="You are not authorized to create slots for this saloon."
+            ).send(403)
+
+        # Validate and create the appointment slot
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(saloon=saloon, staff=staff)
+            return PrepareResponse(
+                success=True,
+                data=serializer.data,
+                message="Appointment slot created successfully."
+            ).send(201)
+        else:
+            return PrepareResponse(
+                success=False,
+                errors=serializer.errors,
+                message="Failed to create appointment slot."
+            ).send(400)
+    
+class AppointmentSlotDetailUpdateDeleteView(SaloonPermissionMixin, generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = AppointmentSlotByStaffSerializer
+    permission_classes = [IsAuthenticated, IsSaloonPermission]
+
+    def get_object(self):
+        saloon_id = self.kwargs['saloon_id']
+        slot_id = self.kwargs['slot_id']
+        return get_object_or_404(AppointmentSlot, id=slot_id, saloon__id=saloon_id)
+
+    def update(self, request, *args, **kwargs):
+        appointment_slot = self.get_object()
+
+        # Ensure that the user updating the slot is the saloon owner
+        if appointment_slot.saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message="You are not authorized to update this slot."
+            ).send(403)
+
+        serializer = self.get_serializer(appointment_slot, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return PrepareResponse(
+                success=True,
+                data=serializer.data,
+                message="Appointment slot updated successfully."
+            ).send(200)
+        else:
+            return PrepareResponse(
+                success=False,
+                errors=serializer.errors,
+                message="Failed to update appointment slot."
+            ).send(400)
+
+    def delete(self, request, *args, **kwargs):
+        appointment_slot = self.get_object()
+        if appointment_slot.saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message="You are not authorized to delete this slot."
+            ).send(403)
+
+        appointment_slot.delete()
+        return PrepareResponse(
+            success=True,
+            message="Appointment slot deleted successfully."
+        ).send(200)
+    
+
+####################################working days###############################################################
+class WorkingDayListCreateView(generics.ListCreateAPIView):
+    serializer_class = WorkingDaySerializer
+    permission_classes = [IsAuthenticated, IsSaloonPermission]
+
+    def get_queryset(self):
+        saloon_id = self.kwargs.get('saloon_id')
+        staff_id = self.kwargs.get('staff_id')
+        return WorkingDay.objects.filter(staff_id=staff_id, staff__saloon__id=saloon_id)
+
+    def get(self, request, *args, **kwargs):
+        working_day = self.get_queryset()
+        serializer = self.get_serializer(working_day, many=True)
+        response = PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message="Working day details retrieved successfully"
+        )
+        return response.send(200)
+
+    def post(self, request, *args, **kwargs):
+        saloon_id = self.kwargs.get('saloon_id')
+        staff_id = self.kwargs.get('staff_id')
+        saloon = get_object_or_404(Saloon, id=saloon_id)
+        staff = get_object_or_404(Staff, id=staff_id, saloon=saloon)
+        working_days_data = request.data
+
+        if isinstance(working_days_data, list):
+            created_working_days = []
+
+            for working_day_data in working_days_data:
+                day_of_week = working_day_data['day_of_week']
+                start_time_str = working_day_data['start_time']
+                end_time_str = working_day_data['end_time']
+
+                # Convert start_time and end_time from strings to datetime.time objects
+                try:
+                    start_time = datetime.strptime(start_time_str, "%H:%M").time()
+                    end_time = datetime.strptime(end_time_str, "%H:%M").time()
+                except ValueError:
+                    return PrepareResponse(
+                        success=False,
+                        message="Invalid time format. Expected format is HH:MM.",
+                        data={
+                            "day_of_week": f"Invalid time format for {day_of_week}.",
+                        }
+                    ).send(400)
+
+                try:
+                    opening_hour = OpeningHour.objects.get(saloon=saloon, day_of_week=day_of_week)
+                except OpeningHour.DoesNotExist:
+                    return PrepareResponse(
+                        success=False,
+                        message=f"The saloon is closed on {day_of_week}.",
+                        data={
+                            "day_of_week": f"The saloon is closed on {day_of_week}.",
+                        }
+                    ).send(400)
+
+                if not opening_hour.is_open:
+                    return PrepareResponse(
+                        success=False,
+                        message=f"The saloon is closed on {day_of_week}.",
+                        data={
+                            "day_of_week": f"The saloon is closed on {day_of_week}.",
+                        }
+                    ).send(400)
+
+                if start_time < opening_hour.start_time or end_time > opening_hour.end_time:
+                    return PrepareResponse(
+                        success=False,
+                        message=f"Working hours must be within the saloon's opening hours on {day_of_week}.",
+                        data={
+                            "day_of_week": f"The working hours are outside the allowed opening hours on {day_of_week}.",
+                        }
+                    ).send(400)
+
+                working_day_serializer = self.get_serializer(data=working_day_data)
+                if working_day_serializer.is_valid():
+                    working_day = working_day_serializer.save(staff=staff)
+                    created_working_days.append(working_day_serializer.data)
+                else:
+                    return PrepareResponse(
+                        success=False,
+                        data=working_day_serializer.errors,
+                        message="Failed to create working day"
+                    ).send(400)
+
+            return PrepareResponse(
+                success=True,
+                data=created_working_days,
+                message="Working days created successfully"
+            ).send(201)
+
+        return PrepareResponse(
+            success=False,
+            message="Invalid data format. Expected a list of working days."
+        ).send(400)
 
 class WorkingDayDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = WorkingDaySerializer
     permission_classes = [IsAuthenticated, IsSaloonPermission]
 
     def get_object(self):
-        return get_object_or_404(WorkingDay, pk=self.kwargs['working_day_id'], staff_saloon_user=self.request.user)
+        return get_object_or_404(WorkingDay, pk=self.kwargs['working_day_id'])
 
     def get(self, request, *args, **kwargs):
         working_day = self.get_object()
@@ -322,12 +705,13 @@ class WorkingDayDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
                 message="Working day updated successfully"
             )
             return response.send(200)
-        response = PrepareResponse(
-            success=False,
-            data=serializer.errors,
-            message="Failed to update working day"
-        )
-        return response.send(400)
+        else:
+            response = PrepareResponse(
+                success=False,
+                data=serializer.errors,
+                message="Failed to update working day"
+            )
+            return response.send(400)
 
     def delete(self, request, *args, **kwargs):
         working_day = self.get_object()
@@ -337,40 +721,11 @@ class WorkingDayDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
             message="Working day deleted successfully"
         )
         return response.send(200)
-    
-
-#########################################Appointments and Appointments Slots#############################################
-
-# class AppointmenntSlotListCreateView(generics.ListCreateAPIView):
-#     serializer_class = AppointmentSlotSerializer
-#     permission_classes = [IsAuthenticated, IsSaloonPermission]
-
-#     def get_queryset(self):
-#         return AppointmentSlot.objects.filter(staff_saloon_user=self.request.user)
-
-#     def post(self, request, *args, **kwargs):
-#         serializer = self.get_serializer(data=request.data)
-
-#         if serializer.is_valid():
-#             serializer.save()
-#             response = PrepareResponse(
-#                 success=True,
-#                 data=serializer.data,
-#                 message="Appointment slot created successfully"
-#             )
-#             return response.send(201)
-
-#         response = PrepareResponse(
-#             success=False,
-#             data=serializer.errors,
-#             message="Failed to create appointment slot"
-#         )
 
 ################################################Opening Hours############################################################
 
-class OpeningHourListCreateView(generics.GenericAPIView):
+class OpeningHourListCreateView(SaloonPermissionMixin, generics.GenericAPIView):
     serializer_class = OpeningHourSerializer
-    permission_classes = [IsAuthenticated, IsSaloonPermission]
 
     def get_queryset(self):
         saloon_id = self.kwargs.get('saloon_id')
@@ -392,80 +747,256 @@ class OpeningHourListCreateView(generics.GenericAPIView):
         return response.send(200)
 
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        saloon_id = self.kwargs.get('saloon_id')
-
+        saloon_id = self.kwargs['saloon_id']
         try:
-            saloon = Saloon.objects.get(id=saloon_id, user=request.user)
+            saloon = Saloon.objects.get(id=saloon_id)
         except Saloon.DoesNotExist:
             response = PrepareResponse(
                 success=False,
-                data={},
-                message="Saloon not found or you do not have permission to add opening hours to this saloon"
+                message='Saloon not found',
+                errors={'non_field_errors': ['Saloon not found']}
+            )
+            return response.send(400)
+
+        if saloon.user != request.user:
+            response = PrepareResponse(
+                success=False,
+                message='You are not authorized to update this saloon',
+                errors={'non_field_errors': ['Unauthorized User login']}
             )
             return response.send(403)
 
-        if serializer.is_valid():
-            # Create the opening hour for the specified saloon
-            serializer.save(saloon=saloon)
+        with transaction.atomic():
+            for day_name, hours in request.data.items():
+                
+                hours = request.data.get(day_name, None)
 
-            response = PrepareResponse(
-                success=True,
-                data=serializer.data,
-                message="Opening hour created successfully"
-            )
-            return response.send(201)
+                if not hours:
+                    hours = {
+                        'start_time': None,
+                        'end_time': None,
+                        'is_open': False
+                    }
+                else:
+                    if hours.get('start_time') == "":
+                        hours['start_time'] = None
+                    if hours.get('end_time') == "":
+                        hours['end_time'] = None
+                
+                day = day_name
+                hours['day_of_week'] = day
+
+                serializer = OpeningHourSerializer(data=hours)
+                
+                if serializer.is_valid():
+                    serializer.save(saloon=saloon)
+                else:
+                    response = PrepareResponse(
+                        success=False,
+                        errors=serializer.errors,
+                        message=f'Error creating working hours for {day_name}'
+                    )
+                    return response.send(400)
 
         response = PrepareResponse(
-            success=False,
-            data=serializer.errors,
-            message="Failed to create opening hour"
+            success=True,
+            message='Working Hours created successfully'
         )
-        return response.send(400)
+        return response.send(201)
     
-class OpeningHourDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = OpeningHourSerializer
-    permission_classes = [IsAuthenticated, IsSaloonPermission]
+    def patch(self, request, *args, **kwargs):
+        saloon_id = self.kwargs.get('saloon_id')
+        try:
+            saloon = Saloon.objects.get(id=saloon_id)
+        except Saloon.DoesNotExist:
+            response = PrepareResponse(
+                success=False,
+                message='Saloon not found',
+                errors={'non_field_errors': ['Saloon not found']}
+            )
+            return response.send(400)
+
+        if saloon.user != request.user:
+            response = PrepareResponse(
+                success=False,
+                message='You are not authorized to update this saloon',
+                errors={'non_field_errors': ['Unauthorized User login']}
+            )
+            return response.send(403)
+
+        updated_hours = []  
+
+        with transaction.atomic():
+            for day_name, partial_data in request.data.items():
+                try:
+                    opening_hour = OpeningHour.objects.get(saloon=saloon, day_of_week=day_name)
+                except OpeningHour.DoesNotExist:
+                    response = PrepareResponse(
+                        success=False,
+                        message=f'Opening hour not found for {day_name}',
+                        errors={'non_field_errors': [f'Opening hour not found for {day_name}']}
+                    )
+                    return response.send(400)
+                if partial_data.get('is_open') is False:
+                    partial_data['start_time'] = '00:00:00'
+                    partial_data['end_time'] = '00:00:00'
+                serializer = OpeningHourSerializer(opening_hour, data=partial_data, partial=True)
+
+                if serializer.is_valid():
+                    serializer.save()
+                    updated_hours.append(serializer.data)
+                else:
+                    response = PrepareResponse(
+                        success=False,
+                        errors=serializer.errors,
+                        message=f'Error updating working hours for {day_name}'
+                    )
+                    return response.send(400)
+        response = PrepareResponse(
+            success=True,
+            message='Opening hours updated successfully',
+            data=updated_hours 
+        )
+        return response.send(200)
+    def delete(self, request, *args, **kwargs):
+        saloon_id = self.kwargs.get('saloon_id')
+
+        try:
+            saloon = Saloon.objects.get(id=saloon_id)
+        except Saloon.DoesNotExist:
+            response = PrepareResponse(
+                success=False,
+                message='Saloon not found',
+                errors={'non_field_errors': ['Saloon not found']}
+            )
+            return response.send(400)
+
+        if saloon.user != request.user:
+            response = PrepareResponse(
+                success=False,
+                message='You are not authorized to delete this saloon\'s opening hours',
+                errors={'non_field_errors': ['Unauthorized User login']}
+            )
+            return response.send(403)
+
+        with transaction.atomic():
+            for day_name in request.data.get('days', []):
+                try:
+                    opening_hour = OpeningHour.objects.get(saloon=saloon, day_of_week=day_name)
+                    opening_hour.delete()
+                except OpeningHour.DoesNotExist:
+                    response = PrepareResponse(
+                        success=False,
+                        message=f"Opening hour for {day_name} does not exist."
+                    )
+                    return response.send(400)
+
+        response = PrepareResponse(
+            success=True,
+            message="Opening hours deleted successfully"
+        )
+        return response.send(200)
+######################################################Gallery###############################################
+class SaloonGalleryListCreateView(SaloonPermissionMixin, generics.GenericAPIView):
+    serializer_class = SaloonGallerySerializer
+    parser_classes = (MultiPartParser,) 
+
+    def post(self, request, *args, **kwargs):
+        saloon_id = self.kwargs['saloon_id']
+        saloon = Saloon.objects.get(id=saloon_id)
+
+        if saloon.user != request.user:
+            response = PrepareResponse(
+                success=False,
+                message='You are not authorized to update this saloon'
+            )
+            return response.send(403)
+        images = request.FILES.getlist('image') 
+        if not images:
+            return PrepareResponse(
+                success=False,
+                message='No images provided',
+            ).send(400)
+
+        serializer_data = []
+        for image in images:
+            serializer = SaloonGallerySerializer(data={'image': image})
+            if serializer.is_valid():
+                serializer.save(saloon=saloon)
+                serializer_data.append(serializer.data)
+            else:
+                return PrepareResponse(
+                    success=False,
+                    errors=serializer.errors,
+                    message=f'Error uploading image {image.name}'
+                ).send(400)
+
+        return PrepareResponse(
+            success=True,
+            data=serializer_data,
+            message=f'{len(images)} images uploaded successfully'
+        ).send(201)
+class SaloonGalleryDetailUpdateDeleteView(SaloonPermissionMixin, generics.GenericAPIView):
+    serializer_class = SaloonGallerySerializer
 
     def get_object(self):
-        saloon_id = self.kwargs.get('saloon_id')
-        opening_hour_id = self.kwargs.get('opening_hour_id')
-        return get_object_or_404(OpeningHour, id=opening_hour_id, saloon__user=self.request.user, saloon_id=saloon_id)
+        saloon_id = self.kwargs['saloon_id']
+        gallery_id = self.kwargs['gallery_id']
+        return get_object_or_404(Gallery, saloon_id=saloon_id, id=gallery_id)
 
-    def get(self, request, *args, **kwargs):
-        opening_hour = self.get_object()
-        serializer = self.get_serializer(opening_hour)
-        response = PrepareResponse(
-            success=True,
-            data=serializer.data,
-            message="Opening hour details fetched successfully"
-        )
-        return response.send(200)
+    class SaloonGalleryDetailUpdateView(SaloonPermissionMixin, generics.GenericAPIView):
+        serializer_class = SaloonGallerySerializer
+        parser_classes = (MultiPartParser,)
 
-    def patch(self, request, *args, **kwargs):
-        opening_hour = self.get_object()
-        serializer = self.get_serializer(opening_hour, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            response = PrepareResponse(
+        def patch(self, request, *args, **kwargs):
+            saloon_id = self.kwargs['saloon_id']
+            gallery_id = self.kwargs['gallery_id']
+            saloon = Saloon.objects.get(id=saloon_id)
+
+            if saloon.user != request.user:
+                return PrepareResponse(
+                    success=False,
+                    message='You are not authorized to update this saloon'
+                ).send(403)
+
+            gallery = Gallery.objects.get(id=gallery_id, saloon=saloon)
+            serializer = self.get_serializer(gallery, data=request.data, partial=True)
+
+            if serializer.is_valid():
+                serializer.save() 
+                return PrepareResponse(
+                    success=True,
+                    data=serializer.data,
+                    message='Gallery image updated successfully'
+                ).send(200)
+            else:
+                return PrepareResponse(
+                    success=False,
+                    errors=serializer.errors,
+                    message='Failed to update gallery image'
+                ).send(400)
+        
+        def delete(self, request, *args, **kwargs):
+            saloon_id = self.kwargs['saloon_id']
+            gallery_id = self.kwargs['gallery_id']
+            saloon = Saloon.objects.get(id=saloon_id)
+
+            if saloon.user != request.user:
+                return PrepareResponse(
+                    success=False,
+                    message='You are not authorized to delete this image'
+                ).send(403)
+            gallery = Gallery.objects.get(id=gallery_id, saloon=saloon)
+            gallery.delete() 
+
+            return PrepareResponse(
                 success=True,
-                data=serializer.data,
-                message="Opening hour updated successfully"
-            )
-            return response.send(200)
+                message='Gallery image deleted successfully'
+            ).send(200)
 
-        response = PrepareResponse(
-            success=False,
-            data=serializer.errors,
-            message="Failed to update opening hour"
-        )
-        return response.send(400)
 
-    def delete(self, request, *args, **kwargs):
-        opening_hour = self.get_object()
-        opening_hour.delete()
-        response = PrepareResponse(
-            success=True,
-            message="Opening hour deleted successfully"
-        )
-        return response.send(200)
+
+
+
+    
+

@@ -36,7 +36,6 @@ class AppointmentSlot(models.Model):
     working_day = models.ForeignKey(WorkingDay, on_delete=models.CASCADE,null=True, blank=True)
     service_variation = models.ForeignKey('services.ServiceVariation', on_delete=models.CASCADE,null=True, blank=True)
     start_time = models.TimeField()
-    # date= models.DateField(null=True)
     end_time = models.TimeField(null=True)
     buffer_time = models.DurationField(default=timedelta(minutes=10),null=True, blank=True)
 

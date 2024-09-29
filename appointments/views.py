@@ -508,27 +508,4 @@ class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
             data=serializer.data
         ).send(200)
 
-class AppointmentUpdateAPIView(generics.GenericAPIView):
-    serializer_class = AppointmentSlotSerializer
-    queryset = AppointmentSlot.objects.all()
-    lookup_field = 'id'
 
-    def put(self, request, *args, **kwargs):
-        appointment_slot = self.get_object()
-        serializer = self.get_serializer(appointment_slot, data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        response = PrepareResponse(
-            success=True,
-            message="Appointment slot updated successfully",
-            data=serializer.data
-        )
-        return response.send(200)
-    
-
-    #   if not request.user.is_authenticated:
-    #         return PrepareResponse(
-    #             success=False,
-    #             message="Authentication required.",
-    #             errors={"non_field_errors": ["User must be authenticated to book an appointment."]}
-    #         ).send(403)
