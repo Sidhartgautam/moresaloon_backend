@@ -78,15 +78,20 @@ class SaloonSerializer(serializers.ModelSerializer):
 
 ###################################Gallery#######################################
 class SaloonGallerySerializer(serializers.ModelSerializer):
+    images=serializers.SerializerMethodField()
     class Meta:
         model = Gallery
-        fields = ['id', 'image']
+        fields = ['id', 'images']
+
+    def get_images(self, obj):
+        return obj.images.url
+
 
     def create(self, validated_data):
         gallery = Gallery.objects.create(**validated_data)
         return gallery
     def update(self, instance, validated_data):
-        instance.image = validated_data.get('image', instance.image)
+        instance.images = validated_data.get('images', instance.images)
         instance.save()
         return instance
     
@@ -188,11 +193,10 @@ class WorkingDaySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WorkingDay
-        fields = ['id','day_of_week', 'start_time', 'end_time']
+        fields = ['id','day_of_week', 'start_time', 'end_time','is_working']
 
     def create(self, validated_data):
         working_day = WorkingDay.objects.create(**validated_data)
-        print(validated_data)
         return working_day
 
     def update(self, instance, validated_data):
@@ -200,6 +204,7 @@ class WorkingDaySerializer(serializers.ModelSerializer):
         instance.day_of_week = validated_data.get('day_of_week', instance.day_of_week)
         instance.start_time = validated_data.get('start_time', instance.start_time)
         instance.end_time = validated_data.get('end_time', instance.end_time)
+        instance.is_working = validated_data.get('is_working', instance.is_working)
         instance.save()
         return instance
 
@@ -238,53 +243,54 @@ class StaffSerializer(serializers.ModelSerializer):
 #################################################Appointments and Appointment Slots##################################################
 class AppointmentSlotByStaffSerializer(serializers.ModelSerializer):
     end_time = serializers.TimeField(read_only=True)
-    date = serializers.SerializerMethodField()
+    working_day = serializers.PrimaryKeyRelatedField(queryset=WorkingDay.objects.all(), required=True)
+    buffer_time = serializers.DurationField(read_only=True)
 
     class Meta:
         model = AppointmentSlot
-        fields = ['id', 'saloon', 'staff', 'start_time', 'service_variation', 'end_time', 'date', 'buffer_time']
+        fields = ['id', 'start_time', 'service_variation', 'end_time', 'buffer_time','working_day','buffer_time']
 
-    def get_date(self, obj):
-        # Assuming the `WorkingDay` has a `date` field or use a relevant field
-        if obj.working_day:
-            return obj.working_day.date.strftime("%Y-%m-%d")
-        return None
+    # def get_date(self, obj):
+    #      return self.date.strftime("%Y-%m-%d")
 
-    def validate(self, data):
-        staff = data.get('staff')
-        start_time = data.get('start_time')
-        service_variation = data.get('service_variation')
-        buffer_time = data.get('buffer_time', timedelta(minutes=10))
+    # def validate(self, data):
+    #     print(data)
+    #     start_time = data.get('start_time')
+    #     service_variation = data.get('service_variation')
+    #     buffer_time = data.get('buffer_time', timedelta(minutes=10))
 
-        if not staff or not start_time or not service_variation:
-            raise serializers.ValidationError("Staff, start time, and service variation are required.")
+    #     # service_duration = service_variation.duration
+    #     # start_datetime = datetime.combine(datetime.today(), start_time)
+    #     # end_datetime = start_datetime + service_duration + (buffer_time or timedelta())
+    #     # data['end_time'] = end_datetime.time()
 
-        if not staff.services.filter(id=service_variation.service.id).exists():
-            raise serializers.ValidationError("The selected staff member does not provide this service.")
+    #     # Check if the new slot overlaps with other existing slots
+    #     overlapping_slots = AppointmentSlot.objects.filter(
+    #         working_day=data.get('working_day'),
+    #         start_time__lt=data['end_time'],
+    #         end_time__gt=start_time
+    #     ).exclude(pk=self.instance.pk if self.instance else None)
 
-        service_duration = service_variation.duration
-        start_datetime = datetime.combine(datetime.today(), start_time)
-        end_datetime = start_datetime + service_duration + (buffer_time or timedelta())
-        data['end_time'] = end_datetime.time()
-        overlapping_slots = AppointmentSlot.objects.filter(
-            staff=staff,
-            working_day=data.get('working_day'),
-            start_time__lt=data['end_time'],
-            end_time__gt=start_time
-        ).exclude(pk=self.instance.pk if self.instance else None)
+    #     if overlapping_slots.exists():
+    #         raise serializers.ValidationError("This time slot overlaps with another slot for this staff member.")
 
-        if overlapping_slots.exists():
-            raise serializers.ValidationError("This time slot overlaps with another slot for this staff member.")
+    #     return data
 
-        return data
-    
-    def create(self, validated_data):
-        appointment_slot = AppointmentSlot.objects.create(**validated_data)
-        return appointment_slot
+    # def create(self, validated_data):
+    #     staff = self.context['staff'] 
+    #     service_variation = validated_data['service_variation']
+    #     if not staff.services.filter(id=service_variation.service.id).exists():
+    #         raise serializers.ValidationError("The selected staff member does not provide this service.")
+
+    #     appointment_slot = AppointmentSlot.objects.create(**validated_data)
+    #     return appointment_slot
 
     def update(self, instance, validated_data):
         instance.start_time = validated_data.get('start_time', instance.start_time)
         instance.end_time = validated_data.get('end_time', instance.end_time)
+        instance.service_variation = validated_data.get('service_variation', instance.service_variation)
+        instance.buffer_time = validated_data.get('buffer_time', instance.buffer_time)
+        instance.working_day = validated_data.get('working_day', instance.working_day)
         instance.save()
         return instance
     
@@ -333,16 +339,3 @@ class AppointmentSerializer(serializers.ModelSerializer):
         return instance
 
 ##########################################StaffAvailability####################################################################
-class StaffAvailabilitySerializer(serializers.Serializer):
-    staff_id = serializers.UUIDField(required=True)
-    appointment_date = serializers.DateField(required=True)
-    start_time = serializers.TimeField(required=True)
-    end_time = serializers.TimeField(required=True)
-
-    def update(self, instance, validated_data):
-        instance.staff = validated_data.get('staff', instance.staff)
-        instance.day_of_week = validated_data.get('day_of_week', instance.day_of_week)
-        instance.start_time = validated_data.get('start_time', instance.start_time)
-        instance.end_time = validated_data.get('end_time', instance.end_time)
-        instance.save()
-        return instance

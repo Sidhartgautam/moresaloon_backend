@@ -2,6 +2,7 @@ from django.db import models
 from saloons.models import Saloon
 from services.models import Service
 import uuid
+from datetime import datetime, timedelta
 # from django.contrib.auth.models import User
 
 class Staff(models.Model):
@@ -14,6 +15,7 @@ class Staff(models.Model):
     description = models.TextField(null=True, blank=True)
     email = models.EmailField(null=True, blank=True)
     contact_no = models.CharField(max_length=20, null=True, blank=True)
+    buffer_time = models.DurationField(default=timedelta(minutes=10),null=True, blank=True)
    
 
     def __str__(self):
@@ -31,8 +33,9 @@ class WorkingDay(models.Model):
         ('Saturday', 'Saturday'),
         ('Sunday', 'Sunday')
     ])
-    start_time = models.TimeField()
-    end_time = models.TimeField()
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    is_working = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.staff.name} - {self.day_of_week}-{self.start_time} to {self.end_time}"
