@@ -20,7 +20,7 @@ from core.utils.auth import SaloonPermissionMixin
 from core.utils.permissions import IsSaloonPermission
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from datetime import datetime
+from datetime import datetime,timedelta
 from rest_framework.parsers import MultiPartParser
 
 
@@ -497,38 +497,55 @@ class AppointmentSlotListCreateView(SaloonPermissionMixin, generics.ListCreateAP
     def get_queryset(self):
         saloon_id = self.kwargs.get('saloon_id')
         staff_id = self.kwargs.get('staff_id')
-        return AppointmentSlot.objects.filter(saloon__id=saloon_id, staff__id=staff_id)
+        staff = get_object_or_404(Staff, id=staff_id, saloon_id=saloon_id)
+        working_days = staff.working_days.all()
 
-    def create(self, request, *args, **kwargs):
-        saloon_id = self.kwargs.get('saloon_id')
-        staff_id = self.kwargs.get('staff_id')
+        available_slots = []
+        buffer_time = staff.buffer_time or timedelta(minutes=10)
 
-        saloon = get_object_or_404(Saloon, id=saloon_id)
-        staff = get_object_or_404(Staff, id=staff_id, saloon=saloon)
+        for working_day in working_days:
+            current_time = working_day.start_time
+            end_time = working_day.end_time
+            if not current_time or not end_time:
+                continue 
+            while current_time < end_time:
+                for service in staff.services.all():
+                    # Iterate through the service's variations
+                    for service_variation in service.variations.all():
+                        duration = service_variation.duration
+                        slot_end_time = (datetime.combine(datetime.today(), current_time) + duration + staff.buffer_time).time()
+                        print(buffer_time)
 
-        # Ensure that the user creating the slot is the saloon owner
-        if saloon.user != request.user:
-            return PrepareResponse(
-                success=False,
-                message="You are not authorized to create slots for this saloon."
-            ).send(403)
+                        if slot_end_time <= end_time:
+                            # Check if the slot is already booked
+                            overlapping_slots = AppointmentSlot.objects.filter(
+                                staff=staff,
+                                working_day=working_day,
+                                start_time__lt=slot_end_time,
+                                end_time__gt=current_time
+                            )
+                            if not overlapping_slots.exists():
+                                available_slots.append({
+                                    'working_day': working_day,
+                                    'staff': staff,
+                                    'start_time': current_time,
+                                    'end_time': slot_end_time,
+                                    'service_variation': service_variation,
+                                    'buffer_time': staff.buffer_time
+                                })
+                        current_time = (datetime.combine(datetime.today(), current_time) + duration + staff.buffer_time).time()
 
-        # Validate and create the appointment slot
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(saloon=saloon, staff=staff)
-            return PrepareResponse(
-                success=True,
-                data=serializer.data,
-                message="Appointment slot created successfully."
-            ).send(201)
-        else:
-            return PrepareResponse(
-                success=False,
-                errors=serializer.errors,
-                message="Failed to create appointment slot."
-            ).send(400)
+        return available_slots
     
+    def get(self, request, *args, **kwargs):
+        available_slots = self.get_queryset()
+        serializer = self.get_serializer(available_slots, many=True)
+        response = PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message="Available slots fetched successfully."
+        )
+        return response.send(200)
 class AppointmentSlotDetailUpdateDeleteView(SaloonPermissionMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = AppointmentSlotByStaffSerializer
     permission_classes = [IsAuthenticated, IsSaloonPermission]
@@ -603,79 +620,45 @@ class WorkingDayListCreateView(generics.ListCreateAPIView):
         staff_id = self.kwargs.get('staff_id')
         saloon = get_object_or_404(Saloon, id=saloon_id)
         staff = get_object_or_404(Staff, id=staff_id, saloon=saloon)
-        working_days_data = request.data
 
-        if isinstance(working_days_data, list):
-            created_working_days = []
+        with transaction.atomic():
+            for day_name, hours in request.data.items():
+                
+                hours = request.data.get(day_name, None)
 
-            for working_day_data in working_days_data:
-                day_of_week = working_day_data['day_of_week']
-                start_time_str = working_day_data['start_time']
-                end_time_str = working_day_data['end_time']
-
-                # Convert start_time and end_time from strings to datetime.time objects
-                try:
-                    start_time = datetime.strptime(start_time_str, "%H:%M").time()
-                    end_time = datetime.strptime(end_time_str, "%H:%M").time()
-                except ValueError:
-                    return PrepareResponse(
-                        success=False,
-                        message="Invalid time format. Expected format is HH:MM.",
-                        data={
-                            "day_of_week": f"Invalid time format for {day_of_week}.",
-                        }
-                    ).send(400)
-
-                try:
-                    opening_hour = OpeningHour.objects.get(saloon=saloon, day_of_week=day_of_week)
-                except OpeningHour.DoesNotExist:
-                    return PrepareResponse(
-                        success=False,
-                        message=f"The saloon is closed on {day_of_week}.",
-                        data={
-                            "day_of_week": f"The saloon is closed on {day_of_week}.",
-                        }
-                    ).send(400)
-
-                if not opening_hour.is_open:
-                    return PrepareResponse(
-                        success=False,
-                        message=f"The saloon is closed on {day_of_week}.",
-                        data={
-                            "day_of_week": f"The saloon is closed on {day_of_week}.",
-                        }
-                    ).send(400)
-
-                if start_time < opening_hour.start_time or end_time > opening_hour.end_time:
-                    return PrepareResponse(
-                        success=False,
-                        message=f"Working hours must be within the saloon's opening hours on {day_of_week}.",
-                        data={
-                            "day_of_week": f"The working hours are outside the allowed opening hours on {day_of_week}.",
-                        }
-                    ).send(400)
-
-                working_day_serializer = self.get_serializer(data=working_day_data)
-                if working_day_serializer.is_valid():
-                    working_day = working_day_serializer.save(staff=staff)
-                    created_working_days.append(working_day_serializer.data)
+                if not hours:
+                    hours = {
+                        'start_time': None,
+                        'end_time': None,
+                        'is_open': False
+                    }
                 else:
-                    return PrepareResponse(
+                    if hours.get('start_time') == "":
+                        hours['start_time'] = None
+                    if hours.get('end_time') == "":
+                        hours['end_time'] = None
+                
+                day = day_name
+                hours['day_of_week'] = day
+
+                serializer = self.get_serializer(data=hours)
+                
+                if serializer.is_valid():
+                    serializer.save(staff=staff)
+                else:
+                    response = PrepareResponse(
                         success=False,
-                        data=working_day_serializer.errors,
-                        message="Failed to create working day"
-                    ).send(400)
+                        errors=serializer.errors,
+                        message=f'Error creating working hours for {day_name}'
+                    )
+                    return response.send(400)
 
-            return PrepareResponse(
-                success=True,
-                data=created_working_days,
-                message="Working days created successfully"
-            ).send(201)
-
-        return PrepareResponse(
-            success=False,
-            message="Invalid data format. Expected a list of working days."
-        ).send(400)
+        response = PrepareResponse(
+            success=True,
+            message='Working Hours created successfully'
+        )
+        return response.send(201)
+               
 
 class WorkingDayDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = WorkingDaySerializer
@@ -695,30 +678,101 @@ class WorkingDayDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         return response.send(200)
 
     def patch(self, request, *args, **kwargs):
-        working_day = self.get_object()
-        serializer = self.get_serializer(working_day, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            response = PrepareResponse(
-                success=True,
-                data=serializer.data,
-                message="Working day updated successfully"
-            )
-            return response.send(200)
-        else:
+        saloon_id = self.kwargs.get('saloon_id')
+        staff_id = self.kwargs.get('staff_id')
+        print(request.data)
+        try:
+            saloon = Saloon.objects.get(id=saloon_id)
+        except Saloon.DoesNotExist:
             response = PrepareResponse(
                 success=False,
-                data=serializer.errors,
-                message="Failed to update working day"
+                message='Saloon not found',
+                errors={'non_field_errors': ['Saloon not found']}
+            )
+            return response.send(400)
+        
+        staff = get_object_or_404(Staff, id=staff_id, saloon=saloon)
+
+        if saloon.user != request.user:
+            response = PrepareResponse(
+                success=False,
+                message='You are not authorized to update this saloon',
+                errors={'non_field_errors': ['Unauthorized User login']}
+            )
+            return response.send(403)
+
+        updated_hours = []  
+
+        with transaction.atomic():
+            for day_name, partial_data in request.data.items():
+                try:
+                    opening_hour = WorkingDay.objects.get(staff=staff, day_of_week=day_name)
+                except WorkingDay.DoesNotExist:
+                    response = PrepareResponse(
+                        success=False,
+                        message=f'Working Days not found for {day_name}',
+                        errors={'non_field_errors': [f'Opening hour not found for {day_name}']}
+                    )
+                    return response.send(400)
+                if partial_data.get('is_working') is False:
+                    partial_data['start_time'] = '00:00:00'
+                    partial_data['end_time'] = '00:00:00'
+                serializer = WorkingDaySerializer(opening_hour, data=partial_data, partial=True)
+
+                if serializer.is_valid():
+                    serializer.save()
+                    updated_hours.append(serializer.data)
+                else:
+                    response = PrepareResponse(
+                        success=False,
+                        errors=serializer.errors,
+                        message=f'Error updating working Days for {day_name}'
+                    )
+                    return response.send(400)
+        response = PrepareResponse(
+            success=True,
+            message='Opening hours updated successfully',
+            data=updated_hours 
+        )
+        return response.send(200)
+    def delete(self, request, *args, **kwargs):
+        saloon_id = self.kwargs.get('saloon_id')
+
+        try:
+            saloon = Saloon.objects.get(id=saloon_id)
+        except Saloon.DoesNotExist:
+            response = PrepareResponse(
+                success=False,
+                message='Saloon not found',
+                errors={'non_field_errors': ['Saloon not found']}
             )
             return response.send(400)
 
-    def delete(self, request, *args, **kwargs):
-        working_day = self.get_object()
-        working_day.delete()
+        staff = get_object_or_404(Staff, id=self.kwargs.get('staff_id'), saloon=saloon)
+
+        if saloon.user != request.user:
+            response = PrepareResponse(
+                success=False,
+                message='You are not authorized to delete this saloon\'s opening hours',
+                errors={'non_field_errors': ['Unauthorized User login']}
+            )
+            return response.send(403)
+
+        with transaction.atomic():
+            for day_name in request.data.get('days', []):
+                try:
+                    opening_hour = OpeningHour.objects.get(staff=staff, day_of_week=day_name)
+                    opening_hour.delete()
+                except OpeningHour.DoesNotExist:
+                    response = PrepareResponse(
+                        success=False,
+                        message=f"Working Days for {day_name} does not exist."
+                    )
+                    return response.send(400)
+
         response = PrepareResponse(
             success=True,
-            message="Working day deleted successfully"
+            message="Opening hours deleted successfully"
         )
         return response.send(200)
 
@@ -899,19 +953,43 @@ class OpeningHourListCreateView(SaloonPermissionMixin, generics.GenericAPIView):
 ######################################################Gallery###############################################
 class SaloonGalleryListCreateView(SaloonPermissionMixin, generics.GenericAPIView):
     serializer_class = SaloonGallerySerializer
-    parser_classes = (MultiPartParser,) 
+    parser_classes = (MultiPartParser,)
+
+    def get_object(self):
+        saloon_id = self.kwargs['saloon_id']
+        gallery_id = self.kwargs['gallery_id']
+        return get_object_or_404(Gallery, saloon_id=saloon_id, id=gallery_id)
+
+    def get(self, request, *args, **kwargs):
+        saloon_id = self.kwargs['saloon_id']
+        saloon = Saloon.objects.get(id=saloon_id)
+
+        if saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message='You are not authorized to update this saloon'
+            ).send(403)
+
+        images = Gallery.objects.filter(saloon=saloon)
+        serializer = SaloonGallerySerializer(images, many=True)
+        return PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message='Gallery images fetched successfully'
+        ).send(200)
 
     def post(self, request, *args, **kwargs):
         saloon_id = self.kwargs['saloon_id']
         saloon = Saloon.objects.get(id=saloon_id)
 
         if saloon.user != request.user:
-            response = PrepareResponse(
+            return PrepareResponse(
                 success=False,
                 message='You are not authorized to update this saloon'
-            )
-            return response.send(403)
-        images = request.FILES.getlist('image') 
+            ).send(403)
+
+        images = request.FILES.getlist('images[]') 
+        print(images) 
         if not images:
             return PrepareResponse(
                 success=False,
@@ -920,7 +998,7 @@ class SaloonGalleryListCreateView(SaloonPermissionMixin, generics.GenericAPIView
 
         serializer_data = []
         for image in images:
-            serializer = SaloonGallerySerializer(data={'image': image})
+            serializer = SaloonGallerySerializer(data={'images': image})  # Save each image
             if serializer.is_valid():
                 serializer.save(saloon=saloon)
                 serializer_data.append(serializer.data)
@@ -936,15 +1014,8 @@ class SaloonGalleryListCreateView(SaloonPermissionMixin, generics.GenericAPIView
             data=serializer_data,
             message=f'{len(images)} images uploaded successfully'
         ).send(201)
-class SaloonGalleryDetailUpdateDeleteView(SaloonPermissionMixin, generics.GenericAPIView):
-    serializer_class = SaloonGallerySerializer
 
-    def get_object(self):
-        saloon_id = self.kwargs['saloon_id']
-        gallery_id = self.kwargs['gallery_id']
-        return get_object_or_404(Gallery, saloon_id=saloon_id, id=gallery_id)
-
-    class SaloonGalleryDetailUpdateView(SaloonPermissionMixin, generics.GenericAPIView):
+class SaloonGalleryDetailUpdateView(SaloonPermissionMixin, generics.GenericAPIView):
         serializer_class = SaloonGallerySerializer
         parser_classes = (MultiPartParser,)
 

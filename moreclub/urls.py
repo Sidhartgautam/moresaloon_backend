@@ -15,7 +15,7 @@ from moreclub.views import (
     AppointmentSlotListCreateView,
     AppointmentSlotDetailUpdateDeleteView,
     SaloonGalleryListCreateView,
-    SaloonGalleryDetailUpdateDeleteView
+    SaloonGalleryDetailUpdateView
 
 )
 
@@ -42,7 +42,7 @@ urlpatterns = [
 
     #################################Working Days################################################
     path('users/saloons/<uuid:saloon_id>/staff/<uuid:staff_id>/working-days/', WorkingDayListCreateView.as_view(), name='working-day-list-create'),
-    path('users/saloons/<uuid:saloon_id>/staff/<uuid:staff_id>/working-days/<int:working_day_id>/', WorkingDayDetailUpdateDeleteView.as_view(), name='working-day-detail-update-delete'),
+    path('users/saloons/<uuid:saloon_id>/staff/<uuid:staff_id>/working-days/detail/', WorkingDayDetailUpdateDeleteView.as_view(), name='working-day-detail-update-delete'),
 
 
     #####################################Opening Hours##################################################
@@ -50,7 +50,9 @@ urlpatterns = [
 
     ##############################################Gallery################################################
     path('users/saloons/<uuid:saloon_id>/gallery/', SaloonGalleryListCreateView.as_view(), name='saloon-gallery-list-create'),
-    path('users/saloons/<uuid:saloon_id>/gallery/<uuid:gallery_id>/', SaloonGalleryDetailUpdateDeleteView.as_view(), name='saloon-gallery-detail-update-delete'),
+    path('users/saloons/<uuid:saloon_id>/gallery/<uuid:gallery_id>/', SaloonGalleryDetailUpdateView.as_view(), name='saloon-gallery-detail-update-delete'),
 
-
+    ##########################################################AppointmentSlot####################################################
+    path('users/saloons/<uuid:saloon_id>/staff/<uuid:staff_id>/appointment/slots/', AppointmentSlotListCreateView.as_view(), name='appointment-sloat-list-create'),
+    path('users/saloons/<uuid:saloon_id>/staff/<uuid:staff_id>/appointment/slots/<int:slot_id>/', AppointmentSlotDetailUpdateDeleteView.as_view(), name='appointment-sloat-detail-update-delete'),
 ]

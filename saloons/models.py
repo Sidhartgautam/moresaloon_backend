@@ -44,7 +44,7 @@ class Gallery(models.Model):
         default = uuid.uuid4, 
         editable = False)
     saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE)
-    image = models.ImageField(upload_to="gallery")
+    images = models.ImageField(upload_to="gallery")
 
     def __str__(self):
         return f"Image for {self.saloon.name}"

@@ -27,6 +27,111 @@ from datetime import datetime,timedelta
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 class BookAppointmentAPIView(APIView):
+    # def post(self, request, *args, **kwargs):
+    #     data = request.data
+
+    #     serializer = AppointmentPlaceSerializer(data=data, context={'request': request})
+
+    #     if not serializer.is_valid():
+    #         return PrepareResponse(
+    #             success=False,
+    #             data=serializer.errors,
+    #             message="Appointment booking failed"
+    #         ).send(400)
+
+    #     validated_data = serializer.validated_data
+
+    #     saloon_id = validated_data['saloon_id']
+    #     service_variations_ids = validated_data['service_variation_ids']
+    #     staff_id = validated_data['staff_id']
+    #     service_id = validated_data['service_id']
+    #     slot_id = validated_data['appointment_slot_id']
+    #     date = validated_data['date']
+    #     buffer_time = validated_data.get('buffer_time', timedelta(minutes=10))
+    #     payment_method = validated_data.get('payment_method')
+    #     payment_method_id = validated_data.get('payment_method_id')
+    #     try:
+    #         saloon = Saloon.objects.get(id=saloon_id)
+    #         service = Service.objects.get(id=service_id, saloon=saloon)
+    #         staff = Staff.objects.get(id=staff_id, saloon=saloon)
+    #         slot = AppointmentSlot.objects.get(id=slot_id,
+    #                                              staff=staff,
+    #                                             #  date=date,
+    #                                             )
+    #     except (Saloon.DoesNotExist, Service.DoesNotExist, Staff.DoesNotExist, AppointmentSlot.DoesNotExist):
+    #         return PrepareResponse(
+    #             success=False,
+    #             message="Invalid saloon, service, staff, or slot.",
+    #             errors={"non_field_errors": ["Invalid data provided."]}
+    #         ).send(400)
+    #     start_time = slot.start_time
+    #     try:
+    #         end_time = calculate_appointment_end_time(
+    #             date=validated_data['date'],
+    #             start_time=start_time,
+    #             service_variations_ids=service_variations_ids,
+    #             buffer_time=buffer_time
+    #         )
+    #     except ValueError as e:
+    #         return PrepareResponse(
+    #             success=False,
+    #             message=str(e)
+    #         ).send(400)
+    #     total_price = calculate_total_appointment_price(service_variations_ids)
+
+    #     try:
+    #         payment_status, message = self.process_payment(
+    #             request=request,
+    #             payment_method=payment_method,
+    #             amount=total_price,
+    #             payment_method_id=payment_method_id,
+    #             user=request.user if request.user.is_authenticated else None,
+    #             saloon=saloon,
+    #             data = data
+    #         )
+    #     except ValidationError as e:
+    #         return PrepareResponse(
+    #             success=False,
+    #             message="Payment failed",
+    #             errors={"payment_errors": str(e)}
+    #         ).send(400)
+        
+    #     if payment_status:
+    #         appointment = Appointment(
+    #             user=request.user if request.user.is_authenticated else None,
+    #             saloon=saloon,
+    #             service=service,
+    #             staff=staff,
+    #             appointment_slot=slot,
+    #             date=validated_data['date'],
+    #             start_time=start_time,
+    #             end_time=end_time,
+    #             payment_method=payment_method,
+    #             payment_status=payment_status,
+    #             total_price=total_price,
+    #             fullname = validated_data['fullname'],
+    #             email = validated_data['email'],
+    #             phone_number = validated_data['phone_number'],
+    #             note = validated_data['note']
+                
+    #         )
+    #         appointment.save()
+
+    #         appointment.service_variation.add(*service_variations_ids)
+    #         slot.save()
+    #         send_confirmation_email(appointment)
+
+    #         return PrepareResponse(
+    #             success=True,
+    #             message="Appointment booked successfully with payment method: {}".format(payment_method),
+    #             data=serializer.data
+    #         ).send(200)
+    #     else:
+    #         return PrepareResponse(
+    #             success=False,
+    #             message=f"Payment failed",
+    #             data={"non_field_errors": [message]},
+    #         ).send(400)
     def post(self, request, *args, **kwargs):
         data = request.data
 
@@ -41,30 +146,26 @@ class BookAppointmentAPIView(APIView):
 
         validated_data = serializer.validated_data
 
+        start_time = validated_data['start_time']
         saloon_id = validated_data['saloon_id']
         service_variations_ids = validated_data['service_variation_ids']
         staff_id = validated_data['staff_id']
         service_id = validated_data['service_id']
-        slot_id = validated_data['appointment_slot_id']
         date = validated_data['date']
         buffer_time = validated_data.get('buffer_time', timedelta(minutes=10))
-        payment_method = validated_data.get('payment_method')
-        payment_method_id = validated_data.get('payment_method_id')
+
         try:
             saloon = Saloon.objects.get(id=saloon_id)
             service = Service.objects.get(id=service_id, saloon=saloon)
             staff = Staff.objects.get(id=staff_id, saloon=saloon)
-            slot = AppointmentSlot.objects.get(id=slot_id,
-                                                 staff=staff,
-                                                #  date=date,
-                                                )
-        except (Saloon.DoesNotExist, Service.DoesNotExist, Staff.DoesNotExist, AppointmentSlot.DoesNotExist):
+        except (Saloon.DoesNotExist, Service.DoesNotExist, Staff.DoesNotExist):
             return PrepareResponse(
                 success=False,
-                message="Invalid saloon, service, staff, or slot.",
+                message="Invalid saloon, service, or staff.",
                 errors={"non_field_errors": ["Invalid data provided."]}
             ).send(400)
-        start_time = slot.start_time
+
+        # Calculate the start time and end time
         try:
             end_time = calculate_appointment_end_time(
                 date=validated_data['date'],
@@ -77,17 +178,18 @@ class BookAppointmentAPIView(APIView):
                 success=False,
                 message=str(e)
             ).send(400)
+
         total_price = calculate_total_appointment_price(service_variations_ids)
 
         try:
             payment_status, message = self.process_payment(
                 request=request,
-                payment_method=payment_method,
+                payment_method=validated_data.get('payment_method'),
                 amount=total_price,
-                payment_method_id=payment_method_id,
                 user=request.user if request.user.is_authenticated else None,
+                payment_method_id=validated_data.get('payment_method_id'),
                 saloon=saloon,
-                data = data
+                data=data
             )
         except ValidationError as e:
             return PrepareResponse(
@@ -95,35 +197,34 @@ class BookAppointmentAPIView(APIView):
                 message="Payment failed",
                 errors={"payment_errors": str(e)}
             ).send(400)
-        
+
         if payment_status:
+            # Create appointment slot on the fly
+
             appointment = Appointment(
                 user=request.user if request.user.is_authenticated else None,
                 saloon=saloon,
                 service=service,
                 staff=staff,
-                appointment_slot=slot,
                 date=validated_data['date'],
                 start_time=start_time,
                 end_time=end_time,
-                payment_method=payment_method,
+                payment_method=validated_data.get('payment_method'),
                 payment_status=payment_status,
                 total_price=total_price,
-                fullname = validated_data['fullname'],
-                email = validated_data['email'],
-                phone_number = validated_data['phone_number'],
-                note = validated_data['note']
-                
+                fullname=validated_data['fullname'],
+                email=validated_data['email'],
+                phone_number=validated_data['phone_number'],
+                note=validated_data['note']
             )
             appointment.save()
 
             appointment.service_variation.add(*service_variations_ids)
-            slot.save()
             send_confirmation_email(appointment)
 
             return PrepareResponse(
                 success=True,
-                message="Appointment booked successfully with payment method: {}".format(payment_method),
+                message="Appointment booked successfully.",
                 data=serializer.data
             ).send(200)
         else:
@@ -131,7 +232,6 @@ class BookAppointmentAPIView(APIView):
                 success=False,
                 message=f"Payment failed",
                 data={"non_field_errors": [message]},
-                # errors = {"non_field_errors": [message]}
             ).send(400)
     
     
@@ -455,30 +555,94 @@ class StaffAppointmentsListAPIView(generics.GenericAPIView):
             meta=paginated_data
         )
         return response.send(200)
-
 class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
     serializer_class = AvailableSlotSerializer
 
     def get_queryset(self):
         staff_id = self.kwargs.get('staff_id')
         date = self.request.query_params.get('date')
-        appointment_booked = Appointment.objects.filter(staff_id=staff_id, date=date).values_list('appointment_slot_id', flat=True)
-        queryset = AppointmentSlot.objects.filter(staff_id=staff_id).order_by('start_time').exclude(id__in=appointment_booked)
 
-        if date:
-            try:
-                date_obj = datetime.strptime(date, "%Y-%m-%d").date()
-                day_name = date_obj.strftime("%A")
-                queryset = queryset.filter(
-                    working_day__day_of_week=day_name,
-                )
-            except ValueError:
-                queryset = queryset.none()
-        return queryset
+        if not date:
+            return []
+        
+        try:
+            date_obj = datetime.strptime(date, "%Y-%m-%d").date()
+            print(f"Parsed date: {date_obj}")
+        except ValueError:
+            print("Invalid date format")
+            return []
+
+        day_name = date_obj.strftime("%A")
+        staff = get_object_or_404(Staff, id=staff_id)
+        print(f"Staff found: {staff.name}")
+
+        # Get all the booked appointment slots for the staff on the given date
+        booked_appointments = Appointment.objects.filter(staff_id=staff_id, date=date)
+
+        available_slots = []
+        buffer_time = staff.buffer_time or timedelta(minutes=10)  # Buffer time between slots
+
+        # Loop through the staff's working days that match the selected date
+        for working_day in staff.working_days.filter(day_of_week=day_name):
+            print(f"Processing working day: {working_day.day_of_week}, Start: {working_day.start_time}, End: {working_day.end_time}")
+            current_time = working_day.start_time
+            end_time = working_day.end_time
+
+            # Ensure that start and end times are valid
+            if not current_time or not end_time:
+                continue
+
+            # Keep generating slots until the working day ends
+            while current_time < end_time:
+                slot_generated = False  # Flag to check if a valid slot was created
+
+                # Loop through each service offered by the staff
+                for service in staff.services.all():
+                    # Check each service variation (since each could have a different duration)
+                    for service_variation in service.variations.all():
+                        duration = service_variation.duration
+                        slot_end_time = (datetime.combine(datetime.today(), current_time) + duration).time()
+
+                        # If the slot end time exceeds the working day end time, stop generating slots
+                        if slot_end_time > end_time:
+                            print(f"Slot end time {slot_end_time} exceeds working hours, stopping slot generation.")
+                            break
+
+                        # Check if the current time slot overlaps with any booked appointment
+                        overlapping_appointments = booked_appointments.filter(
+                            start_time__lt=slot_end_time,
+                            end_time__gt=current_time
+                        )
+
+                        # If there are no overlapping appointments, the slot is available
+                        if not overlapping_appointments.exists():
+                            print(f"Available slot found: {current_time} to {slot_end_time}")
+                            available_slots.append({
+                                'working_day': working_day,
+                                'staff': staff,
+                                'start_time': current_time,
+                                'end_time': slot_end_time,
+                                'service_variation': service_variation,
+                                'buffer_time': buffer_time
+                            })
+
+                            # Move the current time forward by the service duration and buffer time
+                            current_time = (datetime.combine(datetime.today(), current_time) + duration + buffer_time).time()
+                            slot_generated = True
+                            break  # Exit the service variation loop and continue generating more slots
+
+                if not slot_generated:
+                    # If no slot was generated, move the current time forward (perhaps by a default buffer if needed)
+                    current_time = (datetime.combine(datetime.today(), current_time) + buffer_time).time()
+
+        print(f"Total available slots: {len(available_slots)}")
+        return available_slots
 
     def get(self, request, *args, **kwargs):
         date = self.request.query_params.get('date')
         now_date = datetime.now().date()
+
+        # Check if the provided date is in the past
         if date:
             try:
                 query_date = datetime.strptime(date, "%Y-%m-%d").date()
@@ -494,18 +658,19 @@ class CreatedAvailableSlotListAPIView(generics.GenericAPIView):
                     message="Invalid date format provided. Use 'YYYY-MM-DD'.",
                     data=None
                 ).send(400)
+
         queryset = self.get_queryset()
-        if not queryset.exists():
+        if not queryset:
             return PrepareResponse(
                 success=False,
                 message="No available slots found.",
                 data=None
             ).send(404)
+
         serializer = self.get_serializer(queryset, many=True)
         return PrepareResponse(
             success=True,
-            message="Available slots created by admin fetched successfully.",
+            message="Available slots fetched successfully.",
             data=serializer.data
         ).send(200)
-
 
