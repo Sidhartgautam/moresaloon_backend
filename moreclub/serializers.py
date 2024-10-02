@@ -107,6 +107,17 @@ class ServiceVariationImageSerializer(serializers.ModelSerializer):
         model = ServiceVariationImage
         fields = ['id', 'image']
 
+class ServiceVariationInfoSerializer(serializers.ModelSerializer):
+    price=serializers.SerializerMethodField()
+    class Meta:
+        model = ServiceVariation
+        fields = ['id', 'name','duration', 'price']
+    def get_price(self, obj):
+        if obj.discount_price:
+            return obj.discount_price
+        else:
+            return obj.price
+
 class ServiceVariationSerializer(serializers.ModelSerializer):
     images = ServiceVariationImageSerializer(many=True, read_only=True)
 
@@ -212,6 +223,11 @@ class ServicesInfoSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     name = serializers.CharField()
 
+class StaffInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Staff
+        fields = ['name','image']
+
 class StaffSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=True)
     contact_no = serializers.CharField(max_length=255, required=True)
@@ -220,7 +236,7 @@ class StaffSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Staff
-        fields = ['id', 'saloon', 'services', 'name', 'email', 'contact_no', 'image']
+        fields = ['id', 'saloon', 'services', 'name', 'email', 'contact_no', 'image','buffer_time']
 
     def create(self, validated_data):
         # Create the Staff object
@@ -234,6 +250,7 @@ class StaffSerializer(serializers.ModelSerializer):
         instance.email = validated_data.get('email', instance.email)
         instance.contact_no = validated_data.get('contact_no', instance.contact_no)
         instance.image = validated_data.get('image', instance.image)
+        instance.buffer_time = validated_data.get('buffer_time', instance.buffer_time)
         instance.save()
         if services_data is not None:
             instance.services.set(services_data)
@@ -323,19 +340,27 @@ class OpeningHourSerializer(serializers.ModelSerializer):
 ##################################################Appointments####################################################################
 
 class AppointmentSerializer(serializers.ModelSerializer):
+    service_variation = serializers.SerializerMethodField()
     class Meta:
         model = Appointment
-        fields = ['id', 'saloon', 'staff', 'service', 'service_variation', 'start_time', 'end_time', 'status','date']
+        fields = ['id','appointment_id','user', 'service_variation', 'start_time', 'end_time', 'fullname','phone_number','date','total_price']
+    def get_service_variation(self, obj):
+        service_variations = ServiceVariation.objects.filter(id__in=obj.service_variation.all())
+        return ServiceVariationInfoSerializer(service_variations, many=True).data
 
-    def create(self, validated_data):
-        appointment = Appointment.objects.create(**validated_data)
-        return appointment
-
-    def update(self, instance, validated_data):
-        instance.start_time = validated_data.get('start_time', instance.start_time)
-        instance.end_time = validated_data.get('end_time', instance.end_time)
-        instance.status = validated_data.get('status', instance.status)
-        instance.save()
-        return instance
-
-##########################################StaffAvailability####################################################################
+##########################################ApointmentDetails####################################################################
+class AppointmentDetailsSerializer(serializers.ModelSerializer):
+    service_variation = serializers.SerializerMethodField()
+    service=ServicesInfoSerializer()
+    staff=StaffInfoSerializer()
+    user=serializers.SerializerMethodField()
+    class Meta:
+        model = Appointment
+        fields = ['id','appointment_id','user','staff','service_variation','service', 'start_time', 'end_time', 'fullname','currency','email','phone_number','date','total_price','status','payment_status','payment_method','created_at']
+    def get_service_variation(self, obj):
+        service_variations = ServiceVariation.objects.filter(id__in=obj.service_variation.all())
+        return ServiceVariationInfoSerializer(service_variations, many=True).data
+    
+    def get_user(self, obj):
+        user = obj.user
+        return f"{user.first_name} {user.last_name}" if user else "Unknown"

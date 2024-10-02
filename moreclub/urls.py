@@ -15,7 +15,10 @@ from moreclub.views import (
     AppointmentSlotListCreateView,
     AppointmentSlotDetailUpdateDeleteView,
     SaloonGalleryListCreateView,
-    SaloonGalleryDetailUpdateView
+    SaloonGalleryDetailUpdateView,
+    StaffAppointmentListView,
+    SaloonAppointmentListView,
+    AppointmentDetailListView,
 
 )
 
@@ -55,4 +58,9 @@ urlpatterns = [
     ##########################################################AppointmentSlot####################################################
     path('users/saloons/<uuid:saloon_id>/staff/<uuid:staff_id>/appointment/slots/', AppointmentSlotListCreateView.as_view(), name='appointment-sloat-list-create'),
     path('users/saloons/<uuid:saloon_id>/staff/<uuid:staff_id>/appointment/slots/<int:slot_id>/', AppointmentSlotDetailUpdateDeleteView.as_view(), name='appointment-sloat-detail-update-delete'),
+
+    #################################################################Appointment################################################################
+    path('users/saloons/<uuid:saloon_id>/appointments/', SaloonAppointmentListView.as_view(), name='appointment-saloon-list-create'),
+    path('users/saloons/<uuid:saloon_id>/staff/<uuid:staff_id>/appointments/', StaffAppointmentListView.as_view(), name='appointment-staff-list'),
+    path('users/saloons/<uuid:saloon_id>/appointments/<uuid:appointment_id>/details/', AppointmentDetailListView.as_view(), name='appointment-detail'),
 ]

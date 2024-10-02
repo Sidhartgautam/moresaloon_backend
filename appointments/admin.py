@@ -7,7 +7,7 @@ class AppointmentAdmin(admin.ModelAdmin):
     fields = (
         'user', 'saloon', 'service', 'service_variation', 
         'staff','date',  'start_time', 'status', 
-        'payment_status', 'payment_method', 'total_price','fullname', 'email', 'phone_number', 'note'
+        'payment_status', 'payment_method', 'total_price','fullname', 'email', 'phone_number', 'note','currency'
     )
     readonly_fields = ('end_time',)  # Make end_time readonly if you want to display it but not edit
 
