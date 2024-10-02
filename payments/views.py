@@ -27,7 +27,7 @@ class CreatePaymentIntentView(generics.GenericAPIView):
                 'price': total_price  
             }
             print("price: ", total_price)
-            url = "http://192.168.1.73:8000/api/payments/all/stripe/create-payment-intent/"
+            url = f"https://moretrek.com/api/payments/all/stripe/create-payment-intent/"
             response = requests.post(url, data={
                 'currency': currency,
                 'payment_method': payment_method,
@@ -42,6 +42,3 @@ class CreatePaymentIntentView(generics.GenericAPIView):
             else:
                 return JsonResponse({'error': 'Failed to create payment intent', 'details': response.json()}, status=403)
         
-        # # except Exception as e:
-        #     # Log and return any other errors
-        #     return JsonResponse({'error': str(e)}, status=500)

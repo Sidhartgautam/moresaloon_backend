@@ -28,6 +28,7 @@ PAYMENT_METHOD_CHOICES = [
 
 
 
+
 class AppointmentSlot(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE)
@@ -71,7 +72,8 @@ class AppointmentSlot(models.Model):
     
 class Appointment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    appointment_id = models.CharField(max_length=50, null=True)
+    currency=models.CharField(max_length=10, null=True, blank=True)
+    appointment_id = models.CharField(max_length=50, null=True,unique=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE)
     service = models.ForeignKey(Service, on_delete=models.CASCADE,null=True, blank=True)
@@ -91,8 +93,15 @@ class Appointment(models.Model):
     email = models.EmailField(null=True, blank=True) 
     phone_number= models.CharField(max_length=20, null=True, blank=True)
     note =models.CharField(max_length=500, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
     def __str__(self):
         return f"{self.id} - {self.user} - {self.saloon} - {self.service} on {self.date} at {self.start_time}"
+    
+    def save(self, *args, **kwargs):
+        if self.saloon:
+            self.currency = self.saloon.currency
+        super().save(*args, **kwargs)
 
     class Meta:
         indexes = [

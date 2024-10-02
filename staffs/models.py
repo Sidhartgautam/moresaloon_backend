@@ -16,6 +16,7 @@ class Staff(models.Model):
     email = models.EmailField(null=True, blank=True)
     contact_no = models.CharField(max_length=20, null=True, blank=True)
     buffer_time = models.DurationField(default=timedelta(minutes=10),null=True, blank=True)
+    is_holiday = models.BooleanField(default=False)
    
 
     def __str__(self):

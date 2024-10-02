@@ -7,9 +7,6 @@ from appointments.models import Appointment
 from django.db.models import Q, Count, Avg
 
 def search(query=None, price_min=None, price_max=None, preferences=None, location=None, country_id=None, amenities=None, sort_price=None,discount_percentage=None, ratings=None):
-    """
-    Search and filter across Saloon, Service, Staff, and ServiceVariation models.
-    """
 
     # Initialize results
     saloon_results = Saloon.objects.none()
@@ -38,7 +35,8 @@ def search(query=None, price_min=None, price_max=None, preferences=None, locatio
                 Q(name__icontains=query) |
                 Q(short_description__icontains=query) |
                 Q(long_description__icontains=query) |
-                Q(address__icontains=query)
+                Q(address__icontains=query) |
+                Q(amenities__icontains=query)
             )
         if location:
             saloon_results = saloon_results.filter(Q(address__icontains=location))
@@ -119,5 +117,4 @@ def search(query=None, price_min=None, price_max=None, preferences=None, locatio
 
     return response if response else None
 
-#check it
 

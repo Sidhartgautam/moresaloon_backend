@@ -1,7 +1,7 @@
 from rest_framework import generics
 from rest_framework.views import APIView
 from saloons.models import Saloon,Gallery
-from appointments.models import AppointmentSlot
+from appointments.models import AppointmentSlot,Appointment
 from services.models import Service,ServiceVariation, ServiceVariationImage
 from openinghours.models import OpeningHour
 from staffs.models import Staff,WorkingDay
@@ -13,7 +13,9 @@ from moreclub.serializers import (ServiceVariationImageSerializer,
                                    WorkingDaySerializer,
                                    ServiceVariationSerializer,
                                    AppointmentSlotByStaffSerializer,
-                                   SaloonGallerySerializer)
+                                   SaloonGallerySerializer,
+                                   AppointmentSerializer,
+                                   AppointmentDetailsSerializer)
 from core.utils.response import PrepareResponse
 from rest_framework.permissions import IsAuthenticated
 from core.utils.auth import SaloonPermissionMixin
@@ -510,10 +512,9 @@ class AppointmentSlotListCreateView(SaloonPermissionMixin, generics.ListCreateAP
                 continue 
             while current_time < end_time:
                 for service in staff.services.all():
-                    # Iterate through the service's variations
                     for service_variation in service.variations.all():
                         duration = service_variation.duration
-                        slot_end_time = (datetime.combine(datetime.today(), current_time) + duration + staff.buffer_time).time()
+                        slot_end_time = (datetime.combine(datetime.today(), current_time) + duration ).time()
                         print(buffer_time)
 
                         if slot_end_time <= end_time:
@@ -1064,6 +1065,89 @@ class SaloonGalleryDetailUpdateView(SaloonPermissionMixin, generics.GenericAPIVi
                 success=True,
                 message='Gallery image deleted successfully'
             ).send(200)
+        
+class SaloonAppointmentListView(SaloonPermissionMixin,generics.ListCreateAPIView):
+    serializer_class = AppointmentSerializer
+    permission_classes = [IsAuthenticated,IsSaloonPermission]
+
+    def get_queryset(self):
+        saloon_id = self.kwargs['saloon_id']
+        return Appointment.objects.filter(saloon_id=saloon_id)
+
+    def get(self, request, *args, **kwargs):
+        saloon_id = self.kwargs['saloon_id']
+        saloon = Saloon.objects.get(id=saloon_id)
+
+        if saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message='You are not authorized to view this saloon'
+            ).send(403)
+        appointments = Appointment.objects.filter(saloon_id=saloon_id)
+        serializer = AppointmentSerializer(appointments, many=True)
+        return PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message='Appointments fetched successfully'
+        ).send(200)
+    
+class StaffAppointmentListView(SaloonPermissionMixin,generics.ListCreateAPIView):
+    serializer_class = AppointmentSerializer
+    permission_classes = [IsAuthenticated,IsSaloonPermission]
+
+    def get_queryset(self):
+        saloon_id = self.kwargs['saloon_id']
+        staff_id = self.kwargs['staff_id']
+        return Staff.objects.filter(saloon_id=saloon_id, id=staff_id)
+
+    def get(self, request, *args, **kwargs):
+        saloon_id = self.kwargs['saloon_id']
+        staff_id = self.kwargs['staff_id']
+        saloon = Saloon.objects.get(id=saloon_id)
+
+        if saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message='You are not authorized to view this saloon'
+            ).send(403)
+        appointments = Appointment.objects.filter(saloon_id=saloon_id, staff_id=staff_id)
+        serializer = AppointmentSerializer(appointments, many=True)
+        return PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message='Appointments fetched successfully'
+        ).send(200)
+    
+class AppointmentDetailListView(SaloonPermissionMixin,generics.ListCreateAPIView):
+    serializer_class = AppointmentDetailsSerializer
+    permission_classes = [IsAuthenticated,IsSaloonPermission]
+
+    def get_queryset(self):
+        saloon_id = self.kwargs['saloon_id']
+        appointment_id = self.kwargs['appointment_id']
+        return Appointment.objects.filter(saloon_id=saloon_id, id=appointment_id)
+
+    def get(self, request, *args, **kwargs):
+        saloon_id = self.kwargs['saloon_id']
+        appointment_id = self.kwargs['appointment_id']
+        saloon = Saloon.objects.get(id=saloon_id)
+
+        if saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message='You are not authorized to view this saloon'
+            ).send(403)
+        appointments = Appointment.objects.get(saloon_id=saloon_id, id=appointment_id)
+        serializer = AppointmentDetailsSerializer(appointments)
+        return PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message='Appointments fetched successfully'
+        ).send(200)
+    
+    
+        
+    
 
 
 
