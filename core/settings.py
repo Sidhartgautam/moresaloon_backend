@@ -17,6 +17,10 @@ from datetime import timedelta
 import os
 from dotenv import load_dotenv
 
+
+
+
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -42,19 +46,22 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
-    # 'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'cloudinary_storage',
+    'cloudinary',
     'rest_framework',
     'rest_framework_simplejwt',
     "drf_spectacular",
     "corsheaders",
     'django_celery_beat',
     'taggit',
+    
+    
 
     # Custom apps
     'users',
@@ -75,15 +82,16 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.utils.country_middleware.CountryDomainMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -122,6 +130,17 @@ DATABASES = {
         'PORT': '5432',                            
     }
 }
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql', 
+#         'NAME': 'salonnewdb',              
+#         'USER': 'salonnewdb',                
+#         'PASSWORD': '2kZTjtrFbirR',     
+#         'HOST': '100.42.187.204',            
+#         'PORT': '5432',                            
+#     }
+# }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -161,13 +180,21 @@ STATIC_URL = '/static/'
 
 MEDIA_URL = '/media/'
 
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': 'dvmqwrhbx',
+    'API_KEY': '831421472727561',
+    'API_SECRET': 'IeJhUr7jhK9-qU-yjm3n_xGG3Js',
+}
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
 if DEBUG:
     # STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
     STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 else:
     STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -215,7 +242,7 @@ SIMPLE_JWT = {
 
 SSO_SERVICE_URL = 'https://moretrek.com/api/'
 
-CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8000/']
+CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8000/', 'https://salon.moretechglobal.com']
 
 EMAIL_BACKEND = config('EMAIL_BACKEND')
 EMAIL_HOST = config('EMAIL_HOST')
