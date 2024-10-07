@@ -72,7 +72,7 @@ class AppointmentSlot(models.Model):
     
 class Appointment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    currency=models.CharField(max_length=10, null=True, blank=True)
+    currency=models.ForeignKey('country.Currency',on_delete=models.CASCADE,null=True,blank=True)
     appointment_id = models.CharField(max_length=50, null=True,unique=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
     saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE)

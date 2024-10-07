@@ -1,27 +1,106 @@
+
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Appointment Confirmation</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f7f7f7;
+            padding: 0;
+            margin: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-top: 8px solid #3498db;
+        }
+        h2 {
+            color: #2c3e50;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        p {
+            line-height: 1.8;
+            color: #555555;
+            font-size: 16px;
+        }
+        .details {
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .details p {
+            margin: 8px 0;
+            font-size: 16px;
+        }
+        .details p strong {
+            color: #34495e;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 14px;
+            color: #888888;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .button-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .button {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 16px;
+            cursor: pointer;
+            display: inline-block;
+        }
+        .button:hover {
+            background-color: #2980b9;
+        }
+    </style>
 </head>
 <body>
-    <h2>Appointment Confirmation</h2>
+    <div class="email-container">
+        <h2>Dear {{ fullname }},</h2>
+        <p>We’re excited to let you know that your appointment has been successfully booked! Here are the details:</p>
 
-    <p>Dear {{ fullname }},</p>
+        <div class="details">
+            <p><strong>Appointment ID:</strong> {{ appointment_id }}</p>
+            <p><strong>Saloon:</strong> {{ saloon_name }}</p>
+            <p><strong>Service:</strong> {{ service_name }}</p>
+            <p><strong>Staff:</strong> {{ staff_name }}</p>
+            <p><strong>Date:</strong> {{ appointment_date }}</p>
+            <li><strong>Time:</strong> {{ start_time }} - {{ end_time }}</li>
+            <li><strong>Total Price:</strong> ${{ total_price }}</li>
+            <li><strong>Notes:</strong> {{ note }}</li>
+        </div>
 
-    <p>Your appointment has been successfully booked! Here are the details:</p>
+        <div class="button-container">
+            <a href="#" class="button">View Appointment</a>
+        </div>
 
-    <ul>
-        <li><strong>Appointment ID:</strong> {{ appointment_id }}</li>
-        <li><strong>Saloon:</strong> {{ saloon_name }}</li>
-        <li><strong>Service:</strong> {{ service_name }}</li>
-        <li><strong>Staff:</strong> {{ staff_name }}</li>
-        <li><strong>Date:</strong> {{ appointment_date }}</li>
-        <li><strong>Time:</strong> {{ start_time }} - {{ end_time }}</li>
-        <li><strong>Total Price:</strong> ${{ total_price }}</li>
-        <li><strong>Notes:</strong> {{ note }}</li>
-    </ul>
-    <p>Thank you for choosing our service!</p>
+        <p>Thank you for choosing Noir. We look forward to seeing you!</p>
+        
+        <p>Best regards,<br>
+        The Salon Team</p>
 
-    <p>Best regards,<br>The Salon Team</p>
+        <div class="footer">
+            <p>&copy; 2024 The Salon Team. All rights reserved.</p>
+            <p><a href="#">Privacy Policy</a> | <a href="#">Contact Us</a></p>
+        </div>
+    </div>
 </body>
 </html>

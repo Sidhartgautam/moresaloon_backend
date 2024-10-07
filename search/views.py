@@ -14,7 +14,7 @@ class SearchView(GenericAPIView):
         preferences = request.query_params.get('preferences', None)
         location = request.query_params.get('location', None) 
         country_id = request.query_params.get('country_id', None)
-        amenities = request.query_params.get('amenities', None)
+        amenities = request.query_params.getlist('amenities[]', None)
         sort_price = request.query_params.get('sort_price', None)
         ratings = request.query_params.get('ratings',None)
         discount_percentage = request.query_params.get('discount_percentage', None)
@@ -30,10 +30,6 @@ class SearchView(GenericAPIView):
             sort_price = sort_price,
             discount_percentage = discount_percentage,
             ratings= ratings
-            
-            
-
-
         )
         
         if results is None:

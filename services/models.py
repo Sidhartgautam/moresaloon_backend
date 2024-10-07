@@ -83,7 +83,7 @@ class ServiceVariation(models.Model):
 class ServiceVariationImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     variation = models.ForeignKey(ServiceVariation, related_name='images', on_delete=models.CASCADE)
-    image = models.ImageField(upload_to='services/service_variations/images')
+    image = models.ImageField(upload_to='services/service_variations')
 
     def __str__(self):
         return f"Image for {self.variation.name}-{self.variation.service.saloon.name}"
