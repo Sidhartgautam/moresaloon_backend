@@ -24,9 +24,9 @@ class Saloon(models.Model):
     banner = models.ImageField(upload_to='saloons/banner', null=True, blank=True)
     email = models.CharField(max_length=255)
     contact_no = models.CharField(max_length=50)
-    website_link = models.CharField(max_length=255, null=True)
-    facebook_link = models.CharField(max_length=255, null=True)
-    instagram_link = models.CharField(max_length=255, null=True)
+    website_link = models.CharField(max_length=255, null=True, blank=True)
+    facebook_link = models.CharField(max_length=255, null=True, blank=True)
+    instagram_link = models.CharField(max_length=255, null=True, blank=True)
     amenities = ArrayField(
             models.CharField(max_length=20, blank=True),
             size=20,
@@ -44,8 +44,24 @@ class Gallery(models.Model):
         default = uuid.uuid4, 
         editable = False)
     saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE)
-    images = models.ImageField(upload_to="gallery")
+    images = models.ImageField(upload_to="saloons/gallery")
 
     def __str__(self):
         return f"Image for {self.saloon.name}"
+    
+# class FeaturedSaloons(models.Model):
+#     id = models.UUIDField(
+#         primary_key=True,
+#         default=uuid.uuid4,
+#         editable=False
+#     )
+#     saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE)
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
+
+#     class Meta:
+#         ordering = ['-created_at']
+
+#     def __str__(self):
+#         return f"{self.saloon.name}"
     

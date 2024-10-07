@@ -289,8 +289,8 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
             booked_end = appointment.end_time
 
         # Check for overlap
-        if not (end_time <= booked_start or start_time >= booked_end):
-            raise serializers.ValidationError("This staff member already has an appointment at this time.")
+            if not (end_time <= booked_start or start_time >= booked_end):
+                raise serializers.ValidationError("This staff member already has an appointment at this time.")
 
         return data
     

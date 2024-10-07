@@ -24,13 +24,16 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from datetime import datetime,timedelta
 from rest_framework.parsers import MultiPartParser
+from django.core.exceptions import PermissionDenied
+from core.utils.normalize_text import normalize_amenity
+
 
 
 
 ##############Saloon###################################
 class SaloonSetupView(SaloonPermissionMixin, generics.ListCreateAPIView):
     serializer_class = SaloonSerializer
-    queryset = Saloon.objects.all()  # Define the queryset for listing
+    queryset = Saloon.objects.all()
     
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -39,7 +42,11 @@ class SaloonSetupView(SaloonPermissionMixin, generics.ListCreateAPIView):
             saloon = serializer.save(user=request.user)
             
             amenities = request.data.getlist('amenities[]')
-            saloon.amenities = amenities
+
+            normalized_amenities = [normalize_amenity(amenity) for amenity in amenities]
+
+
+            saloon.amenities = normalized_amenities
             saloon.save()
             saloon_detail = self.get_serializer(saloon).data
 
@@ -72,45 +79,33 @@ class SaloonDetailUpdateView(SaloonPermissionMixin, generics.RetrieveUpdateAPIVi
     def get_object(self):
         saloon = get_object_or_404(Saloon, pk=self.kwargs['saloon_id'])
         if saloon.user != self.request.user:
-            response = PrepareResponse(
-                success=False,
-                message='You are not authorized to perform this action on this Saloon'
-            )
-            return response.send(403)
-        return saloon  
+            raise PermissionDenied("You are not authorized to perform this action on this Saloon")
+        return saloon
 
     def get(self, request, *args, **kwargs):
         saloon = self.get_object()
-        if isinstance(saloon, PrepareResponse):
-            return saloon
         serializer = self.get_serializer(saloon)
-        response = PrepareResponse(
+        return PrepareResponse(
             success=True,
             data=serializer.data,
             message='Saloon details fetched successfully'
-        )
-        return response.send(200)
+        ).send(200)
 
     def patch(self, request, *args, **kwargs):
         saloon = self.get_object()
-        if isinstance(saloon, PrepareResponse):
-            return saloon
         serializer = self.get_serializer(saloon, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            response = PrepareResponse(
+            return PrepareResponse(
                 success=True,
                 data=serializer.data,
                 message='Saloon updated successfully'
-            )
-            return response.send(200)
-
-        response = PrepareResponse(
+            ).send(200)
+        return PrepareResponse(
             success=False,
             errors=serializer.errors,
             message='Error updating saloon'
-        )
-        return response.send(400)
+        ).send(400)
 
 class UserSaloonListView(SaloonPermissionMixin, generics.GenericAPIView):
     serializer_class = SaloonSerializer
@@ -184,6 +179,13 @@ class ServiceVariationListCreateView(generics.GenericAPIView):
                 return response.send(400)
 
             serializer_data = []
+            if not images:
+                response = PrepareResponse(
+                    success=False,
+                    data={},
+                    errors={'non_field_errors': ['Please upload at least one image']},
+                )
+                return response.send(400)
             for image in images:
                 serializer_service_var_image = ServiceVariationImageSerializer(data={'variation': service_var.id, 'image': image})
                 if serializer_service_var_image.is_valid():
@@ -467,6 +469,8 @@ class StaffDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         serializer = self.get_serializer(staff, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            services=request.data.getlist('services[]')
+            staff.services.set(services)
             response = PrepareResponse(
                 success=True,
                 data=serializer.data,
@@ -712,7 +716,7 @@ class WorkingDayDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
                     response = PrepareResponse(
                         success=False,
                         message=f'Working Days not found for {day_name}',
-                        errors={'non_field_errors': [f'Opening hour not found for {day_name}']}
+                        errors={'non_field_errors': [f'Working hour not found for {day_name}']}
                     )
                     return response.send(400)
                 if partial_data.get('is_working') is False:
@@ -732,7 +736,7 @@ class WorkingDayDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
                     return response.send(400)
         response = PrepareResponse(
             success=True,
-            message='Opening hours updated successfully',
+            message='Working hours updated successfully',
             data=updated_hours 
         )
         return response.send(200)
@@ -754,7 +758,7 @@ class WorkingDayDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
         if saloon.user != request.user:
             response = PrepareResponse(
                 success=False,
-                message='You are not authorized to delete this saloon\'s opening hours',
+                message='You are not authorized to delete this saloon\'s working hours',
                 errors={'non_field_errors': ['Unauthorized User login']}
             )
             return response.send(403)
@@ -773,7 +777,7 @@ class WorkingDayDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
 
         response = PrepareResponse(
             success=True,
-            message="Opening hours deleted successfully"
+            message="Working hours deleted successfully"
         )
         return response.send(200)
 
@@ -972,7 +976,7 @@ class SaloonGalleryListCreateView(SaloonPermissionMixin, generics.GenericAPIView
             ).send(403)
 
         images = Gallery.objects.filter(saloon=saloon)
-        serializer = SaloonGallerySerializer(images, many=True)
+        serializer = SaloonGallerySerializer(images, many=True, context={'request': request})  # Pass request context
         return PrepareResponse(
             success=True,
             data=serializer.data,
@@ -989,8 +993,10 @@ class SaloonGalleryListCreateView(SaloonPermissionMixin, generics.GenericAPIView
                 message='You are not authorized to update this saloon'
             ).send(403)
 
-        images = request.FILES.getlist('images[]') 
-        print(images) 
+        # Use 'images' instead of 'images[]'
+        images = request.FILES.getlist('images[]')
+        print(f"Images: {images}")  # Debugging line to check if images are coming through
+
         if not images:
             return PrepareResponse(
                 success=False,
@@ -999,7 +1005,7 @@ class SaloonGalleryListCreateView(SaloonPermissionMixin, generics.GenericAPIView
 
         serializer_data = []
         for image in images:
-            serializer = SaloonGallerySerializer(data={'images': image})  # Save each image
+            serializer = SaloonGallerySerializer(data={'images': image}, context={'request': request})
             if serializer.is_valid():
                 serializer.save(saloon=saloon)
                 serializer_data.append(serializer.data)
@@ -1015,7 +1021,6 @@ class SaloonGalleryListCreateView(SaloonPermissionMixin, generics.GenericAPIView
             data=serializer_data,
             message=f'{len(images)} images uploaded successfully'
         ).send(201)
-
 class SaloonGalleryDetailUpdateView(SaloonPermissionMixin, generics.GenericAPIView):
         serializer_class = SaloonGallerySerializer
         parser_classes = (MultiPartParser,)
