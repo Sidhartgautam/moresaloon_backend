@@ -45,6 +45,7 @@ class Gallery(models.Model):
         editable = False)
     saloon = models.ForeignKey(Saloon, on_delete=models.CASCADE)
     images = models.ImageField(upload_to="saloons/gallery")
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
 
     def __str__(self):
         return f"Image for {self.saloon.name}"

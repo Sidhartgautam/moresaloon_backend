@@ -106,6 +106,13 @@ class SaloonDetailUpdateView(SaloonPermissionMixin, generics.RetrieveUpdateAPIVi
             errors=serializer.errors,
             message='Error updating saloon'
         ).send(400)
+    def delete(self,request,*args,**kwargs):
+        saloon = self.get_object()
+        saloon.delete()
+        return PrepareResponse(
+            success=True,
+            message="Saloon deleted successfully"
+        ).send(200)
 
 class UserSaloonListView(SaloonPermissionMixin, generics.GenericAPIView):
     serializer_class = SaloonSerializer
