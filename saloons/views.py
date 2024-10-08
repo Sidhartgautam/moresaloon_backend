@@ -107,16 +107,23 @@ class GalleryUploadView(generics.GenericAPIView):
     
 class GalleryListView(generics.GenericAPIView):
     serializer_class = GallerySerializer
+    pagination_class = CustomPageNumberPagination
     # permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         saloon_id = self.kwargs.get('saloon_id')
         queryset = Gallery.objects.filter(saloon_id=saloon_id).order_by('-created_at')
-        serializer = self.get_serializer(queryset, many=True)
-        response = PrepareResponse(
+        paginator = self.pagination_class()
+        queryset = paginator.paginate_queryset(queryset, request)
+        serializer = self.serializer_class(queryset, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+        result= paginated_data['results']
+        del paginated_data['results']
+        response= PrepareResponse(
             success=True,
-            data=serializer.data,
-            message="Images fetched successfully"
+            message="Images fetched successfully",
+            data=result,
+            meta=paginated_data
         )
         return response.send(200)
     
