@@ -692,7 +692,6 @@ class WorkingDayDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
     def patch(self, request, *args, **kwargs):
         saloon_id = self.kwargs.get('saloon_id')
         staff_id = self.kwargs.get('staff_id')
-        print(request.data)
         try:
             saloon = Saloon.objects.get(id=saloon_id)
         except Saloon.DoesNotExist:
@@ -717,8 +716,9 @@ class WorkingDayDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
 
         with transaction.atomic():
             for day_name, partial_data in request.data.items():
+                print(f"Received day_name: {day_name} with data: {partial_data}")
                 try:
-                    opening_hour = WorkingDay.objects.get(staff=staff, day_of_week=day_name)
+                    working_day = WorkingDay.objects.get(staff=staff, day_of_week=day_name)
                 except WorkingDay.DoesNotExist:
                     response = PrepareResponse(
                         success=False,
@@ -726,21 +726,53 @@ class WorkingDayDetailUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
                         errors={'non_field_errors': [f'Working hour not found for {day_name}']}
                     )
                     return response.send(400)
+                
                 if partial_data.get('is_working') is False:
                     partial_data['start_time'] = '00:00:00'
                     partial_data['end_time'] = '00:00:00'
-                serializer = WorkingDaySerializer(opening_hour, data=partial_data, partial=True)
+                else:
+                    working_day_start_time_str = partial_data.get('start_time')
+                    working_day_end_time_str = partial_data.get('end_time')
 
+                    if working_day_start_time_str and working_day_end_time_str:
+                        try:
+                            if len(working_day_start_time_str) == 5: 
+                                working_day_start_time_str += ':00'
+                            if len(working_day_end_time_str) == 5:
+                                working_day_end_time_str += ':00'
+
+                            working_day_start_time = datetime.strptime(working_day_start_time_str, '%H:%M:%S').time()
+                            working_day_end_time = datetime.strptime(working_day_end_time_str, '%H:%M:%S').time()
+                        except ValueError:
+                            response = PrepareResponse(
+                                success=False,
+                                message="Invalid time format. Please use HH:MM or HH:MM:SS format.",
+                                errors={'non_field_errors': [f'Invalid time format for {day_name}']}
+                            )
+                            return response.send(400)
+                        opening_hour = OpeningHour.objects.get(saloon=saloon, day_of_week=day_name)
+                        if working_day_start_time < opening_hour.start_time or working_day_end_time > opening_hour.end_time:
+                            response = PrepareResponse(
+                                success=False,
+                                message=f"Staff working hours for {day_name} must be within saloon's opening hours ({opening_hour.start_time} - {opening_hour.end_time}).",
+                                errors={'non_field_errors': [f"Invalid working hours for {day_name}"]}
+                            )
+                            return response.send(400)
+                serializer = WorkingDaySerializer(working_day, data=partial_data, partial=True)
                 if serializer.is_valid():
                     serializer.save()
                     updated_hours.append(serializer.data)
                 else:
+                    print(serializer.data)
+                    print(serializer.errors)
+                    print(day_name)
                     response = PrepareResponse(
                         success=False,
                         errors=serializer.errors,
                         message=f'Error updating working Days for {day_name}'
                     )
                     return response.send(400)
+                
         response = PrepareResponse(
             success=True,
             message='Working hours updated successfully',
