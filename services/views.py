@@ -13,9 +13,10 @@ class ServiceListView(generics.GenericAPIView):
 
     def get_queryset(self):
         saloon_id = self.kwargs.get('saloon_id')
-        queryset = Service.objects.all()
+        country_code = self.request.country_code
+        queryset = Service.objects.filter(country__code=country_code)
         if saloon_id:
-            queryset = queryset.filter(saloon_id=saloon_id)
+            queryset = queryset.filter(saloon_id=saloon_id, country_code=country_code)
         return queryset
     def get(self, request, *args, **kwargs):
         saloon_id = self.kwargs.get('saloon_id')
@@ -145,9 +146,10 @@ class ServiceVariationListView(generics.GenericAPIView):
 
     def get_queryset(self):
         service_id = self.kwargs.get('service_id')
-        queryset = ServiceVariation.objects.all()
+        country_code = self.request.country_code
+        queryset = ServiceVariation.objects.filter(country_code=country_code).distinct()
         if service_id:
-            queryset = queryset.filter(service_id=service_id)
+            queryset = queryset.filter(service_id=service_id, country_code=country_code)
         return queryset
     def get(self, request, *args, **kwargs):
         service_id = self.kwargs.get('service_id')
@@ -172,12 +174,14 @@ class NestedServiceListView(generics.GenericAPIView):
     # permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        country_code = self.request.country_code
         saloon_id = self.kwargs.get('saloon_id')
         if saloon_id:
-            return Service.objects.filter(saloon_id=saloon_id)
+            return Service.objects.filter(saloon_id=saloon_id, saloon__country__code=country_code)
         return Service.objects.none()
 
     def get(self, request, *args, **kwargs):
+        country_code = self.request.country_code
         saloon_id = self.kwargs.get('saloon_id')
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True, context={'saloon': saloon_id})

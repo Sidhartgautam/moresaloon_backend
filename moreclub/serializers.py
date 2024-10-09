@@ -217,11 +217,8 @@ class WorkingDaySerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkingDay
         fields = ['id','day_of_week', 'start_time', 'end_time','is_working']
+
     
-    def validate(self, data):
-        if data['start_time'] >= data['end_time']:
-            raise serializers.ValidationError("Start time must be before end time.")
-        return data
 
     def create(self, validated_data):
         working_day = WorkingDay.objects.create(**validated_data)
@@ -285,40 +282,6 @@ class AppointmentSlotByStaffSerializer(serializers.ModelSerializer):
         model = AppointmentSlot
         fields = ['id', 'start_time', 'service_variation', 'end_time', 'buffer_time','working_day','buffer_time']
 
-    # def get_date(self, obj):
-    #      return self.date.strftime("%Y-%m-%d")
-
-    # def validate(self, data):
-    #     print(data)
-    #     start_time = data.get('start_time')
-    #     service_variation = data.get('service_variation')
-    #     buffer_time = data.get('buffer_time', timedelta(minutes=10))
-
-    #     # service_duration = service_variation.duration
-    #     # start_datetime = datetime.combine(datetime.today(), start_time)
-    #     # end_datetime = start_datetime + service_duration + (buffer_time or timedelta())
-    #     # data['end_time'] = end_datetime.time()
-
-    #     # Check if the new slot overlaps with other existing slots
-    #     overlapping_slots = AppointmentSlot.objects.filter(
-    #         working_day=data.get('working_day'),
-    #         start_time__lt=data['end_time'],
-    #         end_time__gt=start_time
-    #     ).exclude(pk=self.instance.pk if self.instance else None)
-
-    #     if overlapping_slots.exists():
-    #         raise serializers.ValidationError("This time slot overlaps with another slot for this staff member.")
-
-    #     return data
-
-    # def create(self, validated_data):
-    #     staff = self.context['staff'] 
-    #     service_variation = validated_data['service_variation']
-    #     if not staff.services.filter(id=service_variation.service.id).exists():
-    #         raise serializers.ValidationError("The selected staff member does not provide this service.")
-
-    #     appointment_slot = AppointmentSlot.objects.create(**validated_data)
-    #     return appointment_slot
 
     def update(self, instance, validated_data):
         instance.start_time = validated_data.get('start_time', instance.start_time)

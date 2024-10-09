@@ -37,7 +37,7 @@ class SaloonListView(generics.GenericAPIView):
     # permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        country_code = request.GET.get('country_code')
+        country_code = self.request.country_code
         selected_service_ids = request.GET.getlist('selectedServiceIds[]')
         queryset = Saloon.objects.all()
 
@@ -107,16 +107,24 @@ class GalleryUploadView(generics.GenericAPIView):
     
 class GalleryListView(generics.GenericAPIView):
     serializer_class = GallerySerializer
+    pagination_class = CustomPageNumberPagination
     # permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
+        country_code = self.request.country_code
         saloon_id = self.kwargs.get('saloon_id')
-        queryset = Gallery.objects.filter(saloon_id=saloon_id)
-        serializer = self.get_serializer(queryset, many=True)
-        response = PrepareResponse(
+        queryset = Gallery.objects.filter(saloon_id=saloon_id, saloon__country__code=country_code).order_by('-created_at')
+        paginator = self.pagination_class()
+        queryset = paginator.paginate_queryset(queryset, request)
+        serializer = self.serializer_class(queryset, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+        result= paginated_data['results']
+        del paginated_data['results']
+        response= PrepareResponse(
             success=True,
-            data=serializer.data,
-            message="Images fetched successfully"
+            message="Images fetched successfully",
+            data=result,
+            meta=paginated_data
         )
         return response.send(200)
     
@@ -188,9 +196,10 @@ class PopularSaloonListView(generics.GenericAPIView):
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
+        country_code = self.request.country_code
         filter_by = self.request.query_params.get('filter', 'all').lower()
         today = now().date()
-        queryset = Saloon.objects.annotate(appointment_count=Count('appointment'))
+        queryset = Saloon.objects.filter(country__code=country_code).annotate(appointment_count=Count('appointment'))
 
         if filter_by == 'week':
             start_date = today - timedelta(days=7)
@@ -239,45 +248,3 @@ class PopularSaloonListView(generics.GenericAPIView):
             meta=paginated_data
         )
         return response.send(code=200)
-
-
-
-
-    
-# class AmenitiesListView(generics.GenericAPIView):
-#     serializer_class = AmenitiesSerializer
-#     # permission_classes = [IsAuthenticated]
-
-#     def get(self, request, *args, **kwargs):
-#         saloon_id = self.kwargs.get('saloon_id')
-#         queryset = Amenities.objects.filter(saloon_id=saloon_id)
-#         serializer = self.get_serializer(queryset, many=True)
-#         response = PrepareResponse(
-#             success=True,
-#             data=serializer.data,
-#             message="Amenities fetched successfully"
-#         )
-#         return response.send(200)
-    
-# class AmenitiesCreateView(generics.GenericAPIView):
-#     serializer_class = AmenitiesSerializer
-#     # permission_classes = [IsAuthenticated]
-
-#     def post(self, request, *args, **kwargs):
-#         data = request.data.copy()
-#         data.update(request.FILES)
-#         serializer = self.get_serializer(data=data)
-#         if serializer.is_valid():
-#             serializer.save()
-#             response = PrepareResponse(
-#                 success=True,
-#                 data=serializer.data,
-#                 message="Amenity created successfully"
-#             )
-#             return response.send(201)
-#         response = PrepareResponse(
-#             success=False,
-#             data=serializer.errors,
-#             message="Amenity creation failed"
-#         )
-#         return response.send(400)
