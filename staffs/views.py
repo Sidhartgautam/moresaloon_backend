@@ -14,10 +14,11 @@ class StaffListCreateView(generics.GenericAPIView):
 
     def get_queryset(self):
         saloon_id = self.kwargs.get('saloon_id')
-        queryset = Staff.objects.all()
+        country_code = self.request.country_code
+        queryset = Staff.objects.filter(saloon__country__code=country_code)
 
         if saloon_id:
-            queryset = queryset.filter(saloon_id=saloon_id)
+            queryset = queryset.filter(saloon_id=saloon_id, saloon__country__code=country_code)
 
         return queryset
 

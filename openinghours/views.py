@@ -42,7 +42,7 @@ class OpeningHoursListView(GenericAPIView):
         if country_code:
             queryset = queryset.filter(saloon__country__code=country_code)
 
-        return queryset.order_by('?')[:4] 
+        return queryset
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
