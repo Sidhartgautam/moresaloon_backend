@@ -26,7 +26,7 @@ class SaloonCreateView(generics.GenericAPIView):
             return response.send(201)
         response = PrepareResponse(
             success=False,
-            data=serializer.errors,
+            data=serializer.errors,  
             message="Saloon creation failed"
         )
         return response.send(400)
