@@ -147,9 +147,10 @@ class ServiceVariationListView(generics.GenericAPIView):
     def get_queryset(self):
         service_id = self.kwargs.get('service_id')
         country_code = self.request.country_code
-        queryset = ServiceVariation.objects.filter(country_code=country_code).distinct()
+        queryset = ServiceVariation.objects.filter(service_id=service_id, service__saloon__country__code=country_code).distinct()
+        
         if service_id:
-            queryset = queryset.filter(service_id=service_id, country_code=country_code)
+            queryset = queryset.filter(service_id=service_id, service__saloon__country__code=country_code)
         return queryset
     def get(self, request, *args, **kwargs):
         service_id = self.kwargs.get('service_id')

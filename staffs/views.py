@@ -139,10 +139,10 @@ class StaffForServiceAPIView(generics.GenericAPIView):
     serializer_class = StaffListSerializer
 
     def get_queryset(self):
-        service_id = self.request.query_params.get('service_id')  # Get the service ID from query parameters
+        service_id = self.request.query_params.get('service_id') 
         queryset = Staff.objects.all()
         if service_id:
-            queryset = queryset.filter(services__id=service_id)  # Filter staff by the service
+            queryset = queryset.filter(services__id=service_id) 
         return queryset
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
