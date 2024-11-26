@@ -153,11 +153,6 @@ class NestedServiceSerializer(serializers.ModelSerializer):#service category
         return image.image.url if image else None
     
 class AllServiceSerializer(serializers.ModelSerializer):
-    # image = serializers.SerializerMethodField()
     class Meta:
         model = Service
         fields = ['id','name' ]
-
-    # def get_image(self, obj):
-    #     image = ServiceImage.objects.filter(service=obj).first()
-    #     return image.image.url if image else None

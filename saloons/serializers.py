@@ -7,7 +7,6 @@ import pytz
 from openinghours.models import OpeningHour
 class SaloonSerializer(serializers.ModelSerializer):
     logo = serializers.ImageField(required=False)  
-    # banner = serializers.ImageField(required=True)
     is_open=serializers.SerializerMethodField()
     class Meta:
         model = Saloon
@@ -54,8 +53,6 @@ class PopularSaloonSerializer(serializers.ModelSerializer):
 
 class SaloonDetailSerializer(serializers.ModelSerializer):
     logo = serializers.ImageField(required=False)
-    # banner = serializers.ImageField(required=False)
-    # reviews = ReviewSerializer(many=True, read_only=True)
     is_open=serializers.SerializerMethodField()
     amenities = serializers.SerializerMethodField()
     class Meta:
