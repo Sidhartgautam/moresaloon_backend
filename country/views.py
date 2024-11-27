@@ -16,3 +16,17 @@ class CountryListView(generics.GenericAPIView):
             message="Country fetched successfully"
         )
         return response.send(200)
+
+class FetchCountryCode(generics.GenericAPIView):
+    def get(self, request, *args, **kwargs):
+        country_code = request.GET.get('country_code')
+        country = Country.objects.filter(country_code=country_code).first()
+        
+        response = PrepareResponse(
+            success=True,
+            data={
+                "currency_code": country.currency.currency_code
+            },
+            message="Country fetched successfully"
+        )
+        return response.send(200)
