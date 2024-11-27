@@ -209,7 +209,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://192.168.1.80:3000",
     "https://more-saloon.vercel.app",
-    "https://www.moredealsclub.com"
+    "https://www.moredealsclub.com",
+    "https://moresalons.com"
 
 
 ]
