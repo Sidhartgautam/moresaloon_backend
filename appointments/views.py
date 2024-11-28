@@ -20,7 +20,7 @@ from .models import Appointment, AppointmentSlot
 from .serializers import AppointmentPlaceSerializer, AppointmentSlotSerializer, AvailableSlotSerializer,AppointmentListSerializer,UserAppointmentListSerializer
 from saloons.models import Saloon
 from core.utils.pagination import CustomPageNumberPagination
-from core.utils.mail import send_confirmation_email,staff_confirmation_email
+from core.utils.mail import send_confirmation_email,staff_confirmation_email,salon_confirmation_email
 from core.utils.appointment import calculate_total_appointment_price, book_appointment,calculate_appointment_end_time
 from datetime import datetime,timedelta
 import random
@@ -122,6 +122,8 @@ class BookAppointmentAPIView(APIView):
             appointment.service_variation.add(*service_variations_ids)
             send_confirmation_email(appointment)
             staff_confirmation_email(appointment)
+            salon_confirmation_email(appointment)
+
 
             return PrepareResponse(
                 success=True,
