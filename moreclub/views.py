@@ -907,58 +907,60 @@ class OpeningHourListCreateView(SaloonPermissionMixin, generics.GenericAPIView):
         try:
             saloon = Saloon.objects.get(id=saloon_id)
         except Saloon.DoesNotExist:
-            response = PrepareResponse(
+            return PrepareResponse(
                 success=False,
                 message='Saloon not found',
                 errors={'non_field_errors': ['Saloon not found']}
-            )
-            return response.send(400)
+            ).send(400)
 
         if saloon.user != request.user:
-            response = PrepareResponse(
+            return PrepareResponse(
                 success=False,
                 message='You are not authorized to update this saloon',
                 errors={'non_field_errors': ['Unauthorized User login']}
-            )
-            return response.send(403)
+            ).send(403)
 
-        updated_hours = [] 
-        
-        print(request.data)
-
+        updated_hours = []
+        print("requested data", request.data)
         with transaction.atomic():
-            for day_name, partial_data in request.data.items():
-                try:
-                    opening_hour = OpeningHour.objects.get(saloon=saloon, day_of_week=day_name)
-                except OpeningHour.DoesNotExist:
-                    response = PrepareResponse(
-                        success=False,
-                        message=f'Opening hour not found for {day_name}',
-                        errors={'non_field_errors': [f'Opening hour not found for {day_name}']}
-                    )
-                    return response.send(400)
-                if partial_data.get('is_open') is False:
-                    partial_data['start_time'] = '00:00:00'
-                    partial_data['end_time'] = '00:00:00'
-                serializer = OpeningHourSerializer(opening_hour, data=partial_data, partial=True)
+            try:
+                for day_name, partial_data in request.data.items():
+                    try:
+                        opening_hour = OpeningHour.objects.get(saloon=saloon, day_of_week=day_name)
+                    except OpeningHour.DoesNotExist:
+                        return PrepareResponse(
+                            success=False,
+                            message=f'Opening hour not found for {day_name}',
+                            errors={'non_field_errors': [f'Opening hour not found for {day_name}']}
+                        ).send(400)
 
-                if serializer.is_valid():
-                    serializer.save()
-                    updated_hours.append(serializer.data)
-                else:
-                    response = PrepareResponse(
-                        success=False,
-                        errors=serializer.errors,
-                        message=f'Error updating working hours for {day_name}'
-                    )
-                    return response.send(400)      
-        response = PrepareResponse(
+                    # Handle 'is_open' logic
+                    if partial_data.get('is_open') is False:
+                        partial_data['start_time'] = '00:00:00'
+                        partial_data['end_time'] = '00:00:00'
+
+                    # Save updated data
+                    serializer = OpeningHourSerializer(opening_hour, data=partial_data, partial=True)
+                    if serializer.is_valid():
+                        instance = serializer.save()
+                        updated_hours.append(serializer.data)
+                        print(f"Updated {day_name}: {serializer.data}")  
+                    else:
+                        print(serializer.errors)  # Debug errors
+                        return PrepareResponse(
+                            success=False,
+                            errors=serializer.errors,
+                            message=f'Error updating working hours for {day_name}'
+                        ).send(400)
+            except Exception as e:
+                print(f"Transaction error: {e}") 
+                raise
+
+        return PrepareResponse(
             success=True,
             message='Opening hours updated successfully',
-            data=updated_hours 
-        )
-        print("updated hours", updated_hours)
-        return response.send(200)
+            data=updated_hours
+        ).send(200)
     def delete(self, request, *args, **kwargs):
         saloon_id = self.kwargs.get('saloon_id')
 
