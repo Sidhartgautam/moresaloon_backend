@@ -922,7 +922,9 @@ class OpeningHourListCreateView(SaloonPermissionMixin, generics.GenericAPIView):
             )
             return response.send(403)
 
-        updated_hours = []  
+        updated_hours = [] 
+        
+        print(request.data)
 
         with transaction.atomic():
             for day_name, partial_data in request.data.items():
@@ -949,12 +951,13 @@ class OpeningHourListCreateView(SaloonPermissionMixin, generics.GenericAPIView):
                         errors=serializer.errors,
                         message=f'Error updating working hours for {day_name}'
                     )
-                    return response.send(400)
+                    return response.send(400)      
         response = PrepareResponse(
             success=True,
             message='Opening hours updated successfully',
             data=updated_hours 
         )
+        print("updated hours", updated_hours)
         return response.send(200)
     def delete(self, request, *args, **kwargs):
         saloon_id = self.kwargs.get('saloon_id')
