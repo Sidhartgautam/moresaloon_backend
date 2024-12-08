@@ -214,6 +214,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://admin-panel-tau-drab.vercel.app"
 
 
+
 ]
 
 CORS_ALLOW_CREDENTIALS = True
