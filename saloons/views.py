@@ -37,12 +37,12 @@ class SaloonListView(generics.GenericAPIView):
     # permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        country_code = self.request.country_code
+        # country_code = self.request.country_code
         selected_service_ids = request.GET.getlist('selectedServiceIds[]')
         queryset = Saloon.objects.all()
 
-        if country_code:
-            queryset = queryset.filter(country__code=country_code)
+        # if country_code:
+        #     queryset = queryset.filter(country__code=country_code)
         if selected_service_ids:
             queryset = queryset.filter(services__id__in=selected_service_ids).distinct()
 
