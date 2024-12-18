@@ -135,10 +135,9 @@ class PopularSaloonListView(generics.GenericAPIView):
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
-        country_code = self.request.country_code
         filter_by = self.request.query_params.get('filter', 'all').lower()
         today = now().date()
-        queryset = Saloon.objects.filter(country__code=country_code).annotate(appointment_count=Count('appointment'))
+        queryset = Saloon.objects.annotate(appointment_count=Count('appointment'))
 
         if filter_by == 'week':
             start_date = today - timedelta(days=7)
