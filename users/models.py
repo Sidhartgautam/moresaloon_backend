@@ -52,7 +52,7 @@ class User(AbstractUser):
         verbose_name_plural="Users"
 
     def __str__(self):
-        return f'{self.username}'
+        return f'{self.username}-{self.email}-{self.phone_number}'
     
     def get_full_name(self):
         return f'{self.first_name} {self.last_name}'
