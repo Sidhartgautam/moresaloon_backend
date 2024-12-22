@@ -1,63 +1,57 @@
 from rest_framework import serializers
-from .models import SaloonOffer
-from services.models import ServiceVariation
-from services.serializers import ServiceVariationSerializer
-from saloons.models import Saloon
+from .models import SaloonCoupons, SaloonOffers
 from django.utils import timezone
+from saloons.models import Saloon
+from services.models import Service
 
-class SaloonOfferSerializer(serializers.ModelSerializer):
-    service_variation = serializers.ListField(child=serializers.UUIDField())
-    currency_symbol = serializers.SerializerMethodField(read_only=True)
-    saloon = serializers.PrimaryKeyRelatedField(queryset=Saloon.objects.all())
-    original_price = serializers.DecimalField(read_only=True, max_digits=10, decimal_places=2)
-    offer_price = serializers.DecimalField(max_digits=10, decimal_places=2)
-    banner = serializers.ImageField(required=False)
-    description = serializers.CharField(required=False)
+
+class CouponSerializer(serializers.ModelSerializer):
+    services = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        help_text="IDs of services the coupon applies to."
+    )
 
     class Meta:
-        model = SaloonOffer
-        fields = ['name', 'saloon', 'service_variation', 'original_price', 'offer_price', 'description', 'banner', 'start_offer', 'end_offer', 'currency_symbol']
-
-    def get_currency_symbol(self, obj):
-        return obj.saloon.currency.symbol
+        model = SaloonCoupons
+        fields = ['id', 'code', 'saloon', 'services', 'discount_percentage', 'start_date', 'end_date', 'is_global']
+        read_only_fields = ['code']  
 
     def validate(self, data):
-        if 'end_offer' in data and data['end_offer'] <= timezone.now():
-            raise serializers.ValidationError("End offer date must be after the current date and time.")
-        
-        saloon = data.get('saloon')
-        service_variations = data.get('service_variation', [])
-
-        for service_variation_id in service_variations:
-            variation = ServiceVariation.objects.filter(id=service_variation_id).first()
-            if variation is None:
-                raise serializers.ValidationError(f"ServiceVariation with id {service_variation_id} does not exist.")
-            if variation.service.saloon != saloon:
-                raise serializers.ValidationError({
-                    'service_variation': f"The service variation does not belong to the selected saloon."
-                })
-            
+        if data.get('is_global') and 'services' in data and data['services']:
+            raise serializers.ValidationError("A coupon cannot be both global and specific to services.")
         return data
 
     def create(self, validated_data):
-        service_variation_ids = validated_data.pop('service_variation', [])
-        saloon_offer = SaloonOffer.objects.create(**validated_data)
-        saloon_offer.service_variation.set(service_variation_ids)
-        return saloon_offer
+        service_ids = validated_data.pop('services', [])
+        coupon = SaloonCoupons.objects.create(**validated_data)
+        coupon.services.set(service_ids)
+        return coupon
     
-class ServiceVariationListSerializer(serializers.ModelSerializer):
-    service_variation_id = serializers.SerializerMethodField()
 
+class SaloonOfferSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ServiceVariation
-        fields = ['service_variation_id', 'name']
+        model = SaloonOffers
+        fields = [
+            'id',
+            'name',
+            'saloon',
+            'banner',
+            'offer_price',
+            'description',
+            'start_offer',
+            'end_offer'
+        ]
+        read_only_fields = ['id', 'start_offer']
 
-    def get_service_variation_id(self, obj):
-        return obj.id
+    def validate(self, data):
+        if 'end_offer' in data and data['end_offer'] <= timezone.now():
+            raise serializers.ValidationError({
+                'end_offer': 'End offer date must be in the future.'
+            })
+        if 'end_offer' in data and data['end_offer'] <= data.get('start_offer', timezone.now()):
+            raise serializers.ValidationError({
+                'end_offer': 'End offer date must be after the start offer date.'
+            })
 
-class SaloonOfferListSerializer(serializers.ModelSerializer):
-    service_variation = ServiceVariationListSerializer(many=True)
-
-    class Meta:
-        model = SaloonOffer
-        fields = ['id', 'name', 'service_variation', 'original_price', 'offer_price', 'description', 'banner', 'start_offer', 'end_offer']
+        return data

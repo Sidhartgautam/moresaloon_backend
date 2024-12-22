@@ -1,9 +1,6 @@
 from django.contrib import admin
-from .models import SaloonOffer
-from services.models import ServiceVariation
-
-class SaloonOfferAdmin(admin.ModelAdmin):
-    list_display = ('name', 'saloon', 'original_price', 'offer_price', 'start_offer', 'end_offer')
+from .models import SaloonOffers, SaloonCoupons
 
 
-admin.site.register(SaloonOffer, SaloonOfferAdmin)
+admin.site.register(SaloonOffers)
+admin.site.register(SaloonCoupons)
