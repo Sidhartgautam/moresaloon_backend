@@ -37,12 +37,10 @@ class SaloonListView(generics.GenericAPIView):
     # permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        # country_code = self.request.country_code
+        country_code = self.request.country_code
         selected_service_ids = request.GET.getlist('selectedServiceIds[]')
-        queryset = Saloon.objects.all()
+        queryset = Saloon.objects.filter(country__code=country_code)
 
-        # if country_code:
-        #     queryset = queryset.filter(country__code=country_code)
         if selected_service_ids:
             queryset = queryset.filter(services__id__in=selected_service_ids).distinct()
 
@@ -135,9 +133,10 @@ class PopularSaloonListView(generics.GenericAPIView):
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
+        country_code = self.request.country_code
         filter_by = self.request.query_params.get('filter', 'all').lower()
         today = now().date()
-        queryset = Saloon.objects.annotate(appointment_count=Count('appointment'))
+        queryset = Saloon.objects.filter(country__code=country_code).annotate(appointment_count=Count('appointment'))
 
         if filter_by == 'week':
             start_date = today - timedelta(days=7)

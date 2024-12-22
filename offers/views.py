@@ -1,12 +1,11 @@
-from rest_framework.generics import GenericAPIView
-from rest_framework import generics
-from .serializers import SaloonOfferSerializer, SaloonOfferListSerializer
-from .models import SaloonOffer
-from core.utils.response import PrepareResponse
-from core.utils.pagination import CustomPageNumberPagination
+from rest_framework.generics import CreateAPIView, ListAPIView
+from .models import SaloonOffers, SaloonCoupons
+from .serializers import SaloonOfferSerializer, CouponSerializer
+from core.utils.response import PrepareResponse  # Assuming you have a utility for consistent responses.
 
-class SaloonOfferCreateView(generics.GenericAPIView):
+class SaloonOfferCreateView(CreateAPIView):
     serializer_class = SaloonOfferSerializer
+    queryset = SaloonOffers.objects.all()
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -15,10 +14,9 @@ class SaloonOfferCreateView(generics.GenericAPIView):
             response = PrepareResponse(
                 success=True,
                 data=serializer.data,
-                message="Saloon Offer created successfully"
+                message="Saloon offer created successfully"
             )
             return response.send(code=201)
-
         response = PrepareResponse(
             success=False,
             data=serializer.errors,
@@ -26,59 +24,53 @@ class SaloonOfferCreateView(generics.GenericAPIView):
         )
         return response.send(code=400)
 
-class SaloonOfferListView(GenericAPIView):
-    serializer_class = SaloonOfferListSerializer
-    pagination_class = CustomPageNumberPagination
 
-    def get_queryset(self):
-        country_code = self.request.country_code
-        if country_code:
-            queryset = SaloonOffer.objects.filter(saloon__country__code=country_code).order_by('?')[:4]
-        else:
-            queryset = SaloonOffer.objects.all().order_by('?')[:4]
-        return queryset
+class SaloonOfferListView(ListAPIView):
+    serializer_class = SaloonOfferSerializer
+    queryset = SaloonOffers.objects.all()
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        paginator = self.pagination_class()
-        queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.get_serializer(queryset, many=True)
-        paginated_data = paginator.get_paginated_response(serializer.data)
-        result = paginated_data['results']
-        del paginated_data['results']
         response = PrepareResponse(
             success=True,
-            message="Saloon Offers fetched successfully",
-            data=result,
-            meta=paginated_data
+            data=serializer.data,
+            message="Saloon offers fetched successfully"
         )
         return response.send(code=200)
+    
+class CouponCreateView(CreateAPIView):
+    serializer_class = CouponSerializer
+    queryset = SaloonCoupons.objects.all()
 
-class SaloonSpecificOfferListView(GenericAPIView):
-    serializer_class = SaloonOfferListSerializer
-    pagination_class = CustomPageNumberPagination
-
-    def get_queryset(self):
-        saloon_id = self.kwargs['saloon_id']
-        country_code = self.request.country_code
-        if country_code:
-            queryset = SaloonOffer.objects.filter(saloon__id=saloon_id, saloon__country__code=country_code)
-        else:
-            queryset = SaloonOffer.objects.filter(saloon__id=saloon_id)
-        return queryset
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            response = PrepareResponse(
+                success=True,
+                data=serializer.data,
+                message="Coupon created successfully"
+            )
+            return response.send(code=201)
+        response = PrepareResponse(
+            success=False,
+            data=serializer.errors,
+            message="Failed to create coupon"
+        )
+        return response.send(code=400)
+    
+class CouponListView(ListAPIView):
+    serializer_class = CouponSerializer
+    queryset = SaloonCoupons.objects.all()
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()
-        paginator = self.pagination_class()
-        queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.get_serializer(queryset, many=True)
-        paginated_data = paginator.get_paginated_response(serializer.data)
-        result = paginated_data['results']
-        del paginated_data['results']
         response = PrepareResponse(
             success=True,
-            message="Saloon Offers fetched successfully",
-            data=result,
-            meta=paginated_data
+            data=serializer.data,
+            message="Coupons fetched successfully"
         )
         return response.send(code=200)
+
