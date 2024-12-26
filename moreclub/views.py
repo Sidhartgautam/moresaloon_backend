@@ -1320,7 +1320,7 @@ class SaloonCouponsCreateView(SaloonPermissionMixin,generics.CreateAPIView):
     permission_classes = [IsAuthenticated,IsSaloonPermission]
 
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        serializer = self.get_serializer(data=request.data,context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return PrepareResponse(
