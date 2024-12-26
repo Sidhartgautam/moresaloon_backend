@@ -78,5 +78,5 @@ urlpatterns = [
     ###########################################################Saloon Coupons#######################################################
     path('users/saloons/<uuid:saloon_id>/coupons/create/', SaloonCouponsCreateView.as_view(), name='saloon-coupons-create'),
     path('users/saloons/<uuid:saloon_id>/coupons/list/', SaloonCouponsListView.as_view(), name='saloon-coupons-list'),
-    path('users/saloons/<uuid:saloon_id>/coupons/<uuid:coupon_id>/details', SaloonCouponsDetailView.as_view(), name='saloon-coupon-detail'),
+    path('users/saloons/<uuid:saloon_id>/coupons/<uuid:coupon_id>/details/', SaloonCouponsDetailView.as_view(), name='saloon-coupon-detail'),
 ]
