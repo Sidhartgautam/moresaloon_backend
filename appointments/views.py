@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from core.utils.response import PrepareResponse
 from django.utils.dateparse import parse_date
 from users.models import User
+from offers.models import CouponUsage
 from core.utils.moredealstoken import get_moredeals_token
 from django.db import transaction
 import stripe
@@ -76,6 +77,19 @@ class BookAppointmentAPIView(APIView):
             ).send(400)
 
         total_price = calculate_total_appointment_price(service_variations_ids)
+        coupon = validated_data.get('coupon')
+        discount_amount = 0
+        if coupon:
+            if CouponUsage.objects.filter(coupon=coupon, user=request.user).exists():
+                    return PrepareResponse(
+                        success=False,
+                        message="You have already used this coupon."
+                    ).send(400)
+            if coupon.percentage_discount:
+                discount_amount = (total_price * coupon.percentage_discount) / 100
+            elif coupon.fixed_discount:
+                discount_amount = min(coupon.fixed_discount, total_price)
+            total_price -= discount_amount
 
         try:
             payment_status, message = self.process_payment(
@@ -112,6 +126,7 @@ class BookAppointmentAPIView(APIView):
                 payment_method=validated_data.get('payment_method'),
                 payment_status=payment_status,
                 total_price=total_price,
+                coupon=coupon,
                 fullname=validated_data['fullname'],
                 email=validated_data['email'],
                 phone_number=validated_data['phone_number'],
@@ -120,6 +135,12 @@ class BookAppointmentAPIView(APIView):
             appointment.save()
 
             appointment.service_variation.add(*service_variations_ids)
+            if coupon:
+                CouponUsage.objects.create(
+                    coupon=coupon,
+                    user=request.user,
+                    appointment=appointment
+                )
             send_confirmation_email(appointment)
             staff_confirmation_email(appointment)
             salon_confirmation_email(appointment)

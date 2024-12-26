@@ -19,6 +19,12 @@ from moreclub.views import (
     StaffAppointmentListView,
     SaloonAppointmentListView,
     AppointmentDetailListView,
+    SaloonOffersCreateView,
+    SaloonOffersListView,
+    SaloonOffersDetailView,
+    SaloonCouponsCreateView,
+    SaloonCouponsListView,
+    SaloonCouponsDetailView
 
 )
 
@@ -63,4 +69,14 @@ urlpatterns = [
     path('users/saloons/<uuid:saloon_id>/appointments/', SaloonAppointmentListView.as_view(), name='appointment-saloon-list-create'),
     path('users/saloons/<uuid:saloon_id>/staff/<uuid:staff_id>/appointments/', StaffAppointmentListView.as_view(), name='appointment-staff-list'),
     path('users/saloons/<uuid:saloon_id>/appointments/<uuid:appointment_id>/details/', AppointmentDetailListView.as_view(), name='appointment-detail'),
+
+    ###########################################################Saloon Offers#######################################################
+    path('users/saloons/<uuid:saloon_id>/offers/create/', SaloonOffersCreateView.as_view(), name='saloon-offers-create'),
+    path('users/saloons/<uuid:saloon_id>/offers/list/', SaloonOffersListView.as_view(), name='saloon-offers-list'),
+    path('users/saloons/<uuid:saloon_id>/offers/<uuid:offer_id>/details', SaloonOffersDetailView.as_view(), name='saloon-offer-detail'),
+
+    ###########################################################Saloon Coupons#######################################################
+    path('users/saloons/<uuid:saloon_id>/coupons/create/', SaloonCouponsCreateView.as_view(), name='saloon-coupons-create'),
+    path('users/saloons/<uuid:saloon_id>/coupons/list/', SaloonCouponsListView.as_view(), name='saloon-coupons-list'),
+    path('users/saloons/<uuid:saloon_id>/coupons/<uuid:coupon_id>/details', SaloonCouponsDetailView.as_view(), name='saloon-coupon-detail'),
 ]

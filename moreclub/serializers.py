@@ -7,6 +7,7 @@ from services.serializers import ServiceVariationSerializer
 from appointments.models import Appointment, AppointmentSlot
 from appointments.serializers import AppointmentSlotSerializer
 from openinghours.models import OpeningHour
+from offers.models import SaloonOffers,SaloonCoupons
 from core.utils.response import PrepareResponse
 from datetime import datetime, timedelta
 
@@ -345,3 +346,116 @@ class AppointmentDetailsSerializer(serializers.ModelSerializer):
     def get_user(self, obj):
         user = obj.user
         return f"{user.first_name} {user.last_name}" if user else "Unknown"
+
+####################################Offers#####################################################
+
+class SaloonOffersSerializer(serializers.ModelSerializer):
+    is_active=serializers.SerializerMethodField
+    class Meta:
+        model = SaloonOffers
+        fields = ['id', 'name', 'description', 'percentage_discount','fixed_discount', 'start_offer', 'end_offer', 'is_active']
+        read_only_fields = ['id','is_active']
+
+    def get_is_active(self, obj):
+        """Return True if the current time is within the offer's active period."""
+        now = datetime.now()
+        return obj.start_offer <= now <= obj.end_offer
+    def create(self, validated_data):
+        offer = SaloonOffers.objects.create(**validated_data)
+        return offer
+
+class SaloonOfferDetailsSerializer(serializers.ModelSerializer):
+    is_active=serializers.SerializerMethodField
+    class Meta:
+        model = SaloonOffers
+        fields = ['id', 'name', 'description', 'percentage_discount','fixed_discount', 'start_offer', 'end_offer', 'is_active']
+        read_only_fields = ['id','is_active']
+
+    def get_is_active(self, obj):
+        """Return True if the current time is within the offer's active period."""
+        now = datetime.now()
+        return obj.start_offer <= now <= obj.end_offer
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get('name', instance.name)
+        instance.description = validated_data.get('description', instance.description)
+        instance.percentage_discount = validated_data.get('percentage_discount', instance.percentage_discount)
+        instance.fixed_discount = validated_data.get('fixed_discount', instance.fixed_discount)
+        instance.start_offer = validated_data.get('start_date', instance.start_offer)
+        instance.end_offer = validated_data.get('end_date', instance.end_offer)
+        instance.save()
+        return instance
+
+########################SaloonCoupons#######################################
+
+class SaloonCouponsSerializer(serializers.ModelSerializer):
+    is_active=serializers.SerializerMethodField
+    class Meta:
+        model = SaloonCoupons
+        fields = ['id','code', 'percentage_discount','fixed_discount', 'start_date', 'end_date', 'is_active','services','is_global']
+        read_only_fields = ['id','is_active']
+
+    def get_is_active(self, obj):
+        """Return True if the current time is within the offer's active period."""
+        if not obj.start_date or not obj.end_date:
+            return False
+        else:
+            now = datetime.now()
+            return obj.start_date <= now <= obj.end_date
+    def validate(self, data):
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        percentage_discount = data.get('percentage_discount')
+        fixed_discount = data.get('fixed_discount')
+        services = data.get('services')
+        is_global = data.get('is_global')
+        if end_date < start_date:
+            raise serializers.ValidationError("End date cannot be before start date.")
+        if percentage_discount and fixed_discount:
+            raise serializers.ValidationError("Only one of 'percentage_discount' or 'fixed_discount' can be selected.")
+        if services and is_global:
+            raise serializers.ValidationError("A coupon cannot be both global and specific to services.")
+        return data
+    
+    def create(self, validated_data):
+        offer = SaloonCoupons.objects.create(**validated_data)
+        return offer
+
+class SaloonCouponsDetailsSerializer(serializers.ModelSerializer):
+    is_active=serializers.SerializerMethodField
+    class Meta:
+        model = SaloonCoupons
+        fields = ['id', 'name', 'description','services', 'code', 'percentage_discount','fixed_discount', 'start_date', 'end_date', 'is_active', 'is_global']
+        read_only_fields = ['id','is_active']
+
+    def get_is_active(self, obj):
+        """Return True if the current time is within the offer's active period."""
+        now = datetime.now()
+        return obj.start_date <= now <= obj.end_date
+    def validate(self, data):
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        percentage_discount = data.get('percentage_discount')
+        fixed_discount = data.get('fixed_discount')
+        services = data.get('services')
+        is_global = data.get('is_global')
+        if end_date < start_date:
+            raise serializers.ValidationError("End date cannot be before start date.")
+        if percentage_discount and fixed_discount:
+            raise serializers.ValidationError("Only one of 'percentage_discount' or 'fixed_discount' can be selected.")
+        if services and is_global:
+            raise serializers.ValidationError("A coupon cannot be both global and specific to services.")
+        return data
+    
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get('name', instance.name)
+        instance.description = validated_data.get('description', instance.description)
+        instance.code = validated_data.get('code', instance.code)
+        instance.percentage_discount = validated_data.get('percentage_discount', instance.percentage_discount)
+        instance.fixed_discount = validated_data.get('fixed_discount', instance.fixed_discount)
+        instance.start_date = validated_data.get('start_date', instance.start_date)
+        instance.end_date = validated_data.get('end_date', instance.end_date)
+        instance.is_global = validated_data.get('is_global', instance.is_global)
+        instance.save()
+        return instance
+    
+ 
