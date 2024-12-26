@@ -109,9 +109,8 @@ class GalleryListView(generics.GenericAPIView):
     # permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        country_code = self.request.country_code
         saloon_id = self.kwargs.get('saloon_id')
-        queryset = Gallery.objects.filter(saloon_id=saloon_id, saloon__country__code=country_code).order_by('-created_at')
+        queryset = Gallery.objects.filter(saloon_id=saloon_id).order_by('-created_at')
         paginator = self.pagination_class()
         queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.serializer_class(queryset, many=True)
