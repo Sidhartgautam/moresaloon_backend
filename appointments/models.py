@@ -3,6 +3,7 @@ from saloons.models import Saloon
 from services.models import Service
 from users.models import User
 from staffs.models import Staff, WorkingDay
+from offers.models import SaloonCoupons
 import uuid
 from django.core.exceptions import ValidationError
 from datetime import datetime, timedelta
@@ -91,6 +92,7 @@ class Appointment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     fullname= models.CharField(max_length=100, null=True, blank=True)
     email = models.EmailField(null=True, blank=True) 
+    coupon= models.ForeignKey(SaloonCoupons, on_delete=models.CASCADE, null=True, blank=True)
     phone_number= models.CharField(max_length=20, null=True, blank=True)
     note =models.CharField(max_length=500, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

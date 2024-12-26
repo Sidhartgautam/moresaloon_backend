@@ -206,8 +206,11 @@ else:
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3001",
     "http://localhost:3000",
-    "http://192.168.1.80:3000",
+    "http://192.168.1.101:3000",
+     "http://192.168.1.101:3001",
+    "http://192.168.1.74:8000",
     "https://more-saloon.vercel.app",
     "https://www.moredealsclub.com",
     "https://moresalons.com",

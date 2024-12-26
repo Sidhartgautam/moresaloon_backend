@@ -160,10 +160,14 @@ class StaffListByServiceAndSaloonAPIView(generics.GenericAPIView):
     def get_queryset(self):
         service_id = self.kwargs.get('service_id')
         saloon_id = self.kwargs.get('saloon_id')
+        country_code = self.request.country_code 
 
+        if not country_code:
+            return Staff.objects.none()  
         queryset = Staff.objects.filter(
             saloon_id=saloon_id,
-            services__id=service_id
+            services__id=service_id,
+            saloon__country__code=country_code
         ).annotate(
             appointment_slot_count=Count('appointmentslot', filter=Q(appointmentslot__service_id=service_id))
         ).order_by('-appointment_slot_count')
@@ -175,8 +179,9 @@ class StaffListByServiceAndSaloonAPIView(generics.GenericAPIView):
         if not queryset.exists():
             return PrepareResponse(
                 success=False,
-                message="No staff found for the selected service and saloon"
+                message="No staff found for the selected service and saloon, or country code is missing"
             ).send(404)
+
         serializer = self.get_serializer(queryset, many=True)
         response = PrepareResponse(
             success=True,

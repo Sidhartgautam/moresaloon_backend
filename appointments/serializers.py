@@ -2,10 +2,11 @@ from datetime import datetime, timedelta
 from rest_framework import serializers
 from saloons.models import Saloon
 from staffs.models import Staff
+from offers.models import SaloonCoupons
 from services.models import Service, ServiceVariation
 from .models import AppointmentSlot, Appointment
 from staffs.models import WorkingDay, BreakTime
-from core.utils.appointment import calculate_total_appointment_price,calculate_appointment_end_time
+from core.utils.appointment import calculate_appointment_end_time
 
 class AppointmentSlotSerializer(serializers.ModelSerializer):
     end_time = serializers.TimeField(read_only=True)
@@ -80,6 +81,7 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
     saloon_id = serializers.UUIDField()
     fullname = serializers.CharField()
     email = serializers.EmailField()
+    coupon_code = serializers.CharField(required=False, allow_blank=True)
     phone_number = serializers.CharField()
     note = serializers.CharField(allow_blank=True, allow_null=True)
     currency = serializers.CharField(read_only=True)
@@ -102,7 +104,8 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
             'email',
             'phone_number',
             'note',
-            'currency'
+            'currency',
+            'coupon_code',
         ]
 
     def validate(self, data):
@@ -112,8 +115,20 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
         start_time = data['start_time']
         service_id = data['service_id']
         service_variations_ids = data.get('service_variation_ids', [])
+        coupon_code = data.get('coupon_code')
         # buffer_time = data.get('buffer_time')
         user = self.context['request'].user
+
+        print("validated_data", data)
+
+        if coupon_code:
+            try:
+                coupon = SaloonCoupons.objects.get(code=coupon_code, saloon_id=saloon_id)
+                if not coupon.is_active():
+                    raise serializers.ValidationError({"coupon_code": "This coupon has expired or is inactive."})
+                data['coupon'] = coupon
+            except SaloonCoupons.DoesNotExist:
+                raise serializers.ValidationError({"coupon_code": "Invalid coupon code."})
 
         saloon = Saloon.objects.get(id=saloon_id)
         if saloon.user == user:

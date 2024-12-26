@@ -1,6 +1,7 @@
 from rest_framework import generics
 from rest_framework.views import APIView
 from saloons.models import Saloon,Gallery
+from offers.models import SaloonOffers,SaloonCoupons
 from appointments.models import AppointmentSlot,Appointment
 from services.models import Service,ServiceVariation, ServiceVariationImage
 from openinghours.models import OpeningHour
@@ -15,7 +16,11 @@ from moreclub.serializers import (ServiceVariationImageSerializer,
                                    AppointmentSlotByStaffSerializer,
                                    SaloonGallerySerializer,
                                    AppointmentSerializer,
-                                   AppointmentDetailsSerializer)
+                                   AppointmentDetailsSerializer,
+                                   SaloonOffersSerializer,
+                                   SaloonOfferDetailsSerializer,
+                                   SaloonCouponsSerializer,
+                                   SaloonCouponsDetailsSerializer,)
 from core.utils.response import PrepareResponse
 from rest_framework.permissions import IsAuthenticated
 from core.utils.auth import SaloonPermissionMixin
@@ -1193,6 +1198,240 @@ class AppointmentDetailListView(SaloonPermissionMixin,generics.ListCreateAPIView
             data=serializer.data,
             message='Appointments fetched successfully'
         ).send(200)
+    
+###########################################SaloonOffer###################################
+class SaloonOffersCreateView(SaloonPermissionMixin,generics.CreateAPIView):
+    serializer_class = SaloonOffersSerializer
+    permission_classes = [IsAuthenticated,IsSaloonPermission]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return PrepareResponse(
+                success=True,
+                data=serializer.data,
+                message='Offer created successfully'
+            ).send(200)
+        else:
+            return PrepareResponse(
+                success=False,
+                errors=serializer.errors,
+                message='Failed to create offer'
+            ).send(400)
+        
+class SaloonOffersListView(SaloonPermissionMixin,generics.ListCreateAPIView):
+    serializer_class = SaloonOffersSerializer
+    permission_classes = [IsAuthenticated,IsSaloonPermission]
+
+    def get_queryset(self):
+        saloon_id = self.kwargs['saloon_id']
+        return SaloonOffers.objects.filter(saloon_id=saloon_id)
+
+    def get(self, request, *args, **kwargs):
+        saloon_id = self.kwargs['saloon_id']
+        saloon = Saloon.objects.get(id=saloon_id)
+
+        if saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message='You are not authorized to view this saloon'
+            ).send(403)
+        offers = SaloonOffers.objects.filter(saloon_id=saloon_id)
+        serializer = SaloonOffersSerializer(offers, many=True)
+        return PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message='Offers fetched successfully'
+        ).send(200)
+    
+class SaloonOffersDetailView(SaloonPermissionMixin,generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = SaloonOfferDetailsSerializer
+    permission_classes = [IsAuthenticated,IsSaloonPermission]
+
+    def get_queryset(self):
+        saloon_id = self.kwargs['saloon_id']
+        offer_id = self.kwargs['offer_id']
+        return SaloonOffers.objects.filter(saloon_id=saloon_id, id=offer_id)
+
+    def get(self, request, *args, **kwargs):
+        saloon_id = self.kwargs['saloon_id']
+        offer_id = self.kwargs['offer_id']
+        saloon = Saloon.objects.get(id=saloon_id)
+
+        if saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message='You are not authorized to view this saloon'
+            ).send(403)
+        offer = SaloonOffers.objects.get(saloon_id=saloon_id, id=offer_id)
+        serializer = SaloonOffersSerializer(offer)
+        return PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message='Offer fetched successfully'
+        ).send(200)
+    def patch(self, request, *args, **kwargs):
+        saloon_id = self.kwargs['saloon_id']
+        offer_id = self.kwargs['offer_id']
+        saloon = Saloon.objects.get(id=saloon_id)
+
+        if saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message='You are not authorized to view this saloon'
+            ).send(403)
+        offer = SaloonOffers.objects.get(saloon_id=saloon_id, id=offer_id)
+        serializer = SaloonOffersSerializer(offer, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return PrepareResponse(
+                success=True,
+                data=serializer.data,
+                message='Offer updated successfully'
+            ).send(200)
+        else:
+            return PrepareResponse(
+                success=False,
+                errors=serializer.errors,
+                message='Failed to update offer'
+            ).send(400)
+
+    def delete(self, request, *args, **kwargs):
+        saloon_id = self.kwargs['saloon_id']
+        offer_id = self.kwargs['offer_id']
+        saloon = Saloon.objects.get(id=saloon_id)
+
+        if saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message='You are not authorized to view this saloon'
+            ).send(403)
+        offer = SaloonOffers.objects.get(saloon_id=saloon_id, id=offer_id)
+        offer.delete()
+        return PrepareResponse(
+            success=True,
+            message='Offer deleted successfully'
+        ).send(200)
+    
+###########################SaloonCoupons####################################################
+class SaloonCouponsCreateView(SaloonPermissionMixin,generics.CreateAPIView):
+    serializer_class = SaloonCouponsSerializer
+    permission_classes = [IsAuthenticated,IsSaloonPermission]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return PrepareResponse(
+                success=True,
+                data=serializer.data,
+                message='Coupon created successfully'
+            ).send(200)
+        else:
+            return PrepareResponse(
+                success=False,
+                errors=serializer.errors,
+                message='Failed to create coupon'
+            ).send(400)
+
+class SaloonCouponsListView(SaloonPermissionMixin,generics.ListCreateAPIView):
+    serializer_class = SaloonCouponsSerializer
+    permission_classes = [IsAuthenticated,IsSaloonPermission]
+
+    def get_queryset(self):
+        saloon_id = self.kwargs['saloon_id']
+        return SaloonCoupons.objects.filter(saloon_id=saloon_id)
+
+    def get(self, request, *args, **kwargs):
+        saloon_id = self.kwargs['saloon_id']
+        saloon = Saloon.objects.get(id=saloon_id)
+
+        if saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message='You are not authorized to view this saloon'
+            ).send(403)
+        coupons = SaloonCoupons.objects.filter(saloon_id=saloon_id)
+        serializer = SaloonCouponsSerializer(coupons, many=True)
+        return PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message='Coupons fetched successfully'
+        ).send(200)
+    
+class SaloonCouponsDetailView(SaloonPermissionMixin,generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = SaloonCouponsSerializer
+    permission_classes = [IsAuthenticated,IsSaloonPermission]
+
+    def get_queryset(self):
+        saloon_id = self.kwargs['saloon_id']
+        coupon_id = self.kwargs['coupon_id']
+        return SaloonCoupons.objects.filter(saloon_id=saloon_id, id=coupon_id)
+
+    def get(self, request, *args, **kwargs):
+        saloon_id = self.kwargs['saloon_id']
+        coupon_id = self.kwargs['coupon_id']
+        saloon = Saloon.objects.get(id=saloon_id)
+
+        if saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message='You are not authorized to view this saloon'
+            ).send(403)
+        coupon = SaloonCoupons.objects.get(saloon_id=saloon_id, id=coupon_id)
+        serializer = SaloonCouponsSerializer(coupon)
+        return PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message='Coupon fetched successfully'
+        ).send(200)
+    def patch(self, request, *args, **kwargs):
+        saloon_id = self.kwargs['saloon_id']
+        coupon_id = self.kwargs['coupon_id']
+        saloon = Saloon.objects.get(id=saloon_id)
+
+        if saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message='You are not authorized to view this saloon'
+            ).send(403)
+        coupon = SaloonCoupons.objects.get(saloon_id=saloon_id, id=coupon_id)
+        serializer = SaloonCouponsSerializer(coupon, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return PrepareResponse(
+                success=True,
+                data=serializer.data,
+                message='Coupon updated successfully'
+            ).send(200)
+        else:
+            return PrepareResponse(
+                success=False,
+                errors=serializer.errors,
+                message='Failed to update coupon'
+            ).send(400)
+
+    def delete(self, request, *args, **kwargs):
+        saloon_id = self.kwargs['saloon_id']
+        coupon_id = self.kwargs['coupon_id']
+        saloon = Saloon.objects.get(id=saloon_id)
+
+        if saloon.user != request.user:
+            return PrepareResponse(
+                success=False,
+                message='You are not authorized to view this saloon'
+            ).send(403)
+        coupon = SaloonCoupons.objects.get(saloon_id=saloon_id, id=coupon_id)
+        coupon.delete()
+        return PrepareResponse(
+            success=True,
+            message='Coupon deleted successfully'
+        ).send(200)
+    
+
+    
+    
     
     
         
