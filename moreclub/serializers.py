@@ -417,8 +417,28 @@ class SaloonCouponsSerializer(serializers.ModelSerializer):
         return data
     
     def create(self, validated_data):
-        offer = SaloonCoupons.objects.create(**validated_data)
-        return offer
+    # Retrieve saloon_id from the request context
+        saloon_id = self.context['request'].parser_context['kwargs'].get('saloon_id')
+        if not saloon_id:
+            raise serializers.ValidationError({"saloon": "Saloon ID is required."})
+
+        # Fetch the saloon instance
+        try:
+            saloon = Saloon.objects.get(id=saloon_id)
+        except Saloon.DoesNotExist:
+            raise serializers.ValidationError({"saloon": "Invalid saloon ID."})
+
+        # Remove services from validated data to set it later
+        service_ids = validated_data.pop('services', [])
+        
+        # Create the coupon
+        coupon = SaloonCoupons.objects.create(saloon=saloon, **validated_data)
+        
+        # Associate services
+        if service_ids:
+            coupon.services.set(service_ids)
+        
+        return coupon
 
 class SaloonCouponsDetailsSerializer(serializers.ModelSerializer):
     is_active=serializers.SerializerMethodField
