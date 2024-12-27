@@ -38,10 +38,15 @@ class CouponSerializer(serializers.ModelSerializer):
 class CouponListSerializer(serializers.ModelSerializer):
     discount_type = serializers.SerializerMethodField()
     is_active = serializers.SerializerMethodField()
+    service = serializers.SerializerMethodField()
+
     class Meta:
         model = SaloonCoupons
-        fields = ['id', 'code', 'percentage_discount', 'fixed_discount', 'start_date', 'end_date', 'is_active', 'is_global','discount_type','services']
+        fields = ['id', 'code', 'percentage_discount', 'fixed_discount', 'start_date', 'end_date', 'is_active', 'is_global','discount_type','service']
 
+    def get_service(self, obj):
+        return [{"id": str(service.id), "name": service.name} for service in obj.services.all()]
+    
     def get_discount_type(self, obj):
         if obj.percentage_discount:
             return "percentage"

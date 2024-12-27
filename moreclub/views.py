@@ -20,6 +20,7 @@ from moreclub.serializers import (ServiceVariationImageSerializer,
                                    SaloonOffersSerializer,
                                    SaloonOfferDetailsSerializer,
                                    SaloonCouponsSerializer,
+                                   SaloonCouponListSerializer,
                                    SaloonCouponsDetailsSerializer,)
 from core.utils.response import PrepareResponse
 from rest_framework.permissions import IsAuthenticated
@@ -1336,12 +1337,12 @@ class SaloonCouponsCreateView(SaloonPermissionMixin,generics.CreateAPIView):
             ).send(400)
 
 class SaloonCouponsListView(SaloonPermissionMixin,generics.ListCreateAPIView):
-    serializer_class = SaloonCouponsSerializer
+    serializer_class = SaloonCouponListSerializer
     permission_classes = [IsAuthenticated,IsSaloonPermission]
 
     def get_queryset(self):
         saloon_id = self.kwargs['saloon_id']
-        return SaloonCoupons.objects.filter(saloon_id=saloon_id)
+        return SaloonCoupons.objects.filter(saloon_id=saloon_id).prefetch_related('services')
 
     def get(self, request, *args, **kwargs):
         saloon_id = self.kwargs['saloon_id']
@@ -1353,7 +1354,7 @@ class SaloonCouponsListView(SaloonPermissionMixin,generics.ListCreateAPIView):
                 message='You are not authorized to view this saloon'
             ).send(403)
         coupons = SaloonCoupons.objects.filter(saloon_id=saloon_id)
-        serializer = SaloonCouponsSerializer(coupons, many=True)
+        serializer = SaloonCouponListSerializer(coupons, many=True)
         return PrepareResponse(
             success=True,
             data=serializer.data,

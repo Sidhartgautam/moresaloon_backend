@@ -78,7 +78,7 @@ class CouponListView(ListAPIView):
                 code=400
             )
 
-        queryset = SaloonCoupons.objects.filter(saloon_id=saloon_id)
+        queryset = SaloonCoupons.objects.filter(saloon_id=saloon_id).prefetch_related('services')
 
         if country_code:
             queryset = queryset.filter(saloon__country__code=country_code)
