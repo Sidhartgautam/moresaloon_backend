@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.utils import timezone
 from saloons.models import Saloon,Gallery
 from country.models import Country,Currency
 from staffs.models import Staff, WorkingDay
@@ -439,6 +440,31 @@ class SaloonCouponsSerializer(serializers.ModelSerializer):
             coupon.services.set(service_ids)
         
         return coupon
+    
+class SaloonCouponListSerializer(serializers.ModelSerializer):
+    discount_type = serializers.SerializerMethodField()
+    is_active = serializers.SerializerMethodField()
+    services = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SaloonCoupons
+        fields = ['id','code', 'percentage_discount', 'fixed_discount', 'start_date', 'end_date', 'is_active', 'is_global','discount_type','services']
+    
+    def get_discount_type(self, obj):
+        if obj.percentage_discount:
+            return "percentage"
+        elif obj.fixed_discount:
+            return "fixed"
+        return None
+
+    def get_is_active(self, obj):
+        """Return True if the current time is within the offer's active period."""
+        now = timezone.now()
+        return obj.start_date <= now <= obj.end_date
+    def get_services(self, obj):
+        return [{"id": str(service.id), "name": service.name} for service in obj.services.all()]
+
+    
 
 class SaloonCouponsDetailsSerializer(serializers.ModelSerializer):
     is_active=serializers.SerializerMethodField
