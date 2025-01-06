@@ -127,6 +127,63 @@ class GalleryListView(generics.GenericAPIView):
     
     
 
+# class PopularSaloonListView(generics.GenericAPIView):
+#     serializer_class = PopularSaloonSerializer
+#     pagination_class = CustomPageNumberPagination
+
+#     def get_queryset(self):
+#         country_code = self.request.country_code
+#         filter_by = self.request.query_params.get('filter', 'all').lower()
+#         today = now().date()
+#         queryset = Saloon.objects.filter(country__code=country_code).annotate(appointment_count=Count('appointment'))
+
+#         if filter_by == 'week':
+#             start_date = today - timedelta(days=7)
+#             queryset = queryset.annotate(
+#                 recent_appointment_count=Count(
+#                     'appointment',
+#                     filter=Q(appointment__date__gte=start_date)
+#                 )
+#             ).order_by('-recent_appointment_count')
+
+#         elif filter_by == 'month':
+#             queryset = queryset.annotate(
+#                 recent_appointment_count=Count(
+#                     'appointment',
+#                     filter=Q(appointment__date__year=today.year, appointment__date__month=today.month)
+#                 )
+#             ).order_by('-recent_appointment_count')
+
+#         elif filter_by == 'year':
+#             queryset = queryset.annotate(
+#                 recent_appointment_count=Count(
+#                     'appointment',
+#                     filter=Q(appointment__date__year=today.year)
+#                 )
+#             ).order_by('-recent_appointment_count')
+
+#         else:
+#             queryset = queryset.order_by('-appointment_count')
+
+#         return queryset
+
+#     def get(self, request, *args, **kwargs):
+#         queryset = self.get_queryset()
+#         paginator = self.pagination_class()
+#         queryset = paginator.paginate_queryset(queryset, request)
+#         serializer = self.serializer_class(queryset, many=True)
+#         paginated_data = paginator.get_paginated_response(serializer.data)
+
+#         result = paginated_data['results']
+#         del paginated_data['results']
+
+#         response = PrepareResponse(
+#             success=True,
+#             message="Saloons fetched successfully",
+#             data=result,
+#             meta=paginated_data
+#         )
+#         return response.send(code=200)
 class PopularSaloonListView(generics.GenericAPIView):
     serializer_class = PopularSaloonSerializer
     pagination_class = CustomPageNumberPagination
