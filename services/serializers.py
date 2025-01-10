@@ -155,4 +155,4 @@ class NestedServiceSerializer(serializers.ModelSerializer):#service category
 class AllServiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
-        fields = ['id','name' ]
+        fields = ['id','name','icon' ]

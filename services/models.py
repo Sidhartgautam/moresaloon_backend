@@ -18,6 +18,7 @@ class Service(models.Model):
     min_duration = models.DurationField(help_text="Base duration of the service (e.g., 1 hour, 30 minutes)", null=True, blank=True)
     max_duration = models.DurationField(help_text="Maximum duration of the service based on variations", null=True, blank=True)
     slug = models.SlugField(max_length=255, unique=True, null=True, blank=True)
+    icon = models.ImageField(upload_to='service_icons/', null=True, blank=True, help_text="Upload an icon for this service")
 
     def update_durations(self):
         variations = self.variations.all()

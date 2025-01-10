@@ -1,4 +1,7 @@
 from rest_framework import generics
+from saloons.models import Saloon
+from django.views import View
+from django.http import JsonResponse
 from .models import About, WhoWeAre, Philosophy, FAQ, PrivacyPolicy, TermsAndCondition
 from .serializers import AboutSerializer, WhoWeAreSerializer, PhilosophySerializer, FAQSerializer, PrivacyPolicySerializer, TermsAndConditionSerializer
 from core.utils.response import PrepareResponse
@@ -84,3 +87,11 @@ class TermsAndConditionView(generics.GenericAPIView):
             message="Terms and Condition retrieved successfully"
         )
         return response.send(200)
+    
+
+class HomeView(View):
+    def get(self, request):
+        restaurants = Saloon.objects.all()
+        for restaurant in restaurants:
+            restaurant.save()
+        return JsonResponse({'restaurants': list(restaurants.values())})

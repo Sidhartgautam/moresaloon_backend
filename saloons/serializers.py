@@ -85,5 +85,18 @@ class SaloonDetailSerializer(serializers.ModelSerializer):
             return False
 
         return opening_hours.start_time <= local_now.time() <= opening_hours.end_time
- 
-        
+    
+
+class SaloonListForMoreDealsSerializer(serializers.ModelSerializer):
+    open_hrs = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Saloon
+        fields = ['id', 'name', 'open_hrs', 'banner', 'address', 'user','slug']
+
+    def get_open_hrs(self, obj):
+        return None
+    
+    def get_user(self, obj):
+        return obj.user.username
