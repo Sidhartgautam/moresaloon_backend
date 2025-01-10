@@ -214,7 +214,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://more-saloon.vercel.app",
     "https://www.moredealsclub.com",
     "https://moresalons.com",
-    "https://admin-panel-tau-drab.vercel.app"
+    "https://admin-panel-tau-drab.vercel.app",
+    "https://web-production-f5d1.up.railway.app"
 
 
 
