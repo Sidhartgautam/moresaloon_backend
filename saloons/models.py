@@ -4,6 +4,7 @@ import uuid
 from country.models import Country,Currency
 from taggit.managers import TaggableManager
 from django.contrib.postgres.fields import ArrayField
+from core.utils.slugify import unique_slug_generator
 
 class Saloon(models.Model):
     id = models.UUIDField(
@@ -33,10 +34,14 @@ class Saloon(models.Model):
             default=list
     )
     is_open= models.BooleanField(default=True)
+    slug= models.SlugField( null=True, blank=True)
 
     def __str__(self):
         return self.name
-
+    def save(self, *args, **kwargs):
+        if self.slug is None:
+            self.slug=unique_slug_generator(self)
+        super().save(*args, **kwargs)
 
 class Gallery(models.Model):
     id = models.UUIDField( 

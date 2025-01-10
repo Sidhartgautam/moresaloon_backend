@@ -1,5 +1,6 @@
 from rest_framework import generics
 from saloons.models import Saloon
+from django.db.models import Max
 from rest_framework.permissions import IsAuthenticated
 from .models import Service,ServiceVariation,ServiceImage
 from .serializers import  ServiceSerializer, ServiceImageSerializer, ServiceVariationSerializer, NestedServiceSerializer,AllServiceSerializer
@@ -197,8 +198,14 @@ class AllServiceListView(generics.GenericAPIView):
     serializer_class = AllServiceSerializer
     pagination_class = CustomPageNumberPagination
 
+    # def get_queryset(self):
+    #     return Service.objects.values('id','name').distinct()
     def get_queryset(self):
-        return Service.objects.values('id','name').distinct()
+        queryset = Service.objects.values('name').annotate(
+            icon=Max('icon'),
+            id=Max('id') 
+        ).order_by('name')
+        return queryset
 
     def get(self, request, *args, **kwargs):
         queryset = self.get_queryset()

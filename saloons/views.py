@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from .models import Saloon,Gallery
-from .serializers import SaloonSerializer, GallerySerializer,PopularSaloonSerializer,SaloonDetailSerializer
+from .serializers import SaloonSerializer, GallerySerializer,PopularSaloonSerializer,SaloonDetailSerializer,SaloonListForMoreDealsSerializer
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.response import PrepareResponse
 from django.db.models import Count, Q
@@ -44,6 +44,30 @@ class SaloonListView(generics.GenericAPIView):
         if selected_service_ids:
             queryset = queryset.filter(services__id__in=selected_service_ids).distinct()
 
+        paginator = self.pagination_class()
+        queryset = paginator.paginate_queryset(queryset, request)
+        serializer = self.serializer_class(queryset, many=True)
+        paginated_data = paginator.get_paginated_response(serializer.data)
+
+        result = paginated_data['results']
+        del paginated_data['results']
+
+        response = PrepareResponse(
+            success=True,
+            message="Saloons fetched successfully",
+            data=result,
+            meta=paginated_data
+        )
+        return response.send(code=200)
+    
+class SaloonListForMoredealsClubView(generics.GenericAPIView):
+    serializer_class = SaloonListForMoreDealsSerializer
+    pagination_class = CustomPageNumberPagination
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        country_code = self.request.country_code
+        queryset = Saloon.objects.filter(country__code=country_code)
         paginator = self.pagination_class()
         queryset = paginator.paginate_queryset(queryset, request)
         serializer = self.serializer_class(queryset, many=True)
