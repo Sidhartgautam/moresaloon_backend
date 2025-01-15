@@ -1,6 +1,8 @@
 from rest_framework import generics
 from saloons.models import Saloon
-from django.db.models import Max,F
+from django.db.models import Max,F,Prefetch,OuterRef,Subquery
+from django.db.models.functions import Coalesce
+from random import Random
 from django.db import models
 from django.db.models.functions import Cast
 from rest_framework.permissions import IsAuthenticated
@@ -181,14 +183,18 @@ class NestedServiceListView(generics.GenericAPIView):
         country_code = self.request.country_code
         saloon_id = self.kwargs.get('saloon_id')
         if saloon_id:
-            return Service.objects.filter(saloon_id=saloon_id, saloon__country__code=country_code)
+            return Service.objects.filter(
+                saloon_id=saloon_id,
+                saloon__country__code=country_code
+            ).select_related('saloon', 'saloon__country').prefetch_related(
+                Prefetch('variations', queryset=ServiceVariation.objects.all()),
+                Prefetch('images', queryset=ServiceImage.objects.all())
+            )
         return Service.objects.none()
 
     def get(self, request, *args, **kwargs):
-        country_code = self.request.country_code
-        saloon_id = self.kwargs.get('saloon_id')
         queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True, context={'saloon': saloon_id})
+        serializer = self.get_serializer(queryset, many=True, context={'saloon': self.kwargs.get('saloon_id')})
         response = PrepareResponse(
             success=True,
             data=serializer.data,
@@ -200,13 +206,21 @@ class AllServiceListView(generics.GenericAPIView):
     serializer_class = AllServiceSerializer
     pagination_class = CustomPageNumberPagination
 
-    # def get_queryset(self):
-    #     return Service.objects.values('id','name').distinct()
     def get_queryset(self):
-        queryset = Service.objects.annotate(
-            latest_icon=Max('icon'), 
-            id_str=Cast('id', output_field=models.CharField()) 
-        ).values('name', 'latest_icon', 'id_str').order_by('name')
+        # Subquery to get a random icon for each service name
+        random_icon = Service.objects.filter(
+            name=OuterRef('name')
+        ).order_by('?').values('icon')[:1]  # '?' tells Django to order randomly
+
+        queryset = (
+            Service.objects.values('name')
+            .annotate(
+                random_icon=Coalesce(Subquery(random_icon), None)  # Annotate with a random icon or None
+            )
+            .order_by('name')  # Order alphabetically by name
+        )
+        for services in queryset:
+            print(services)
         return queryset
 
     def get(self, request, *args, **kwargs):

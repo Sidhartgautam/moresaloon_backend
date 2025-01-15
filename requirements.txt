@@ -14,6 +14,7 @@ cloudinary==1.41.0
 cron-descriptor==1.4.5
 Django==5.0.7
 django-celery-beat==2.7.0
+django-ckeditor-5==0.2.15
 django-cloudinary-storage==0.3.0
 django-cors-headers==4.6.0
 django-taggit==6.1.0

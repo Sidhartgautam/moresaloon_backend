@@ -18,6 +18,7 @@ url_patterns = [
     ),
     path("docs/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
     path('api/', include('core.api_urls')),
+    path("ckeditor5/", include('django_ckeditor_5.urls')),
 ]
 
 urlpatterns = static(

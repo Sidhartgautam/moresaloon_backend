@@ -136,23 +136,26 @@ class ServiceCreateUpdateSerializer(serializers.ModelSerializer):
 
 
     
-class NestedServiceSerializer(serializers.ModelSerializer):#service category
+class NestedServiceSerializer(serializers.ModelSerializer):
     variations = serializers.SerializerMethodField(read_only=True)
-    image = ServiceImageSerializer(read_only=True)
+    image = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Service
-        fields = [ 'id','name', 'variations', 'image','slug']
+        fields = ['id', 'name', 'variations', 'image', 'slug', 'icon']
 
     def get_variations(self, obj):
-        saloon = self.context.get('saloon')
-        variations = ServiceVariation.objects.filter(service=obj, service__saloon=saloon)
+        variations = obj.variations.filter(service=obj, service__saloon=self.context.get('saloon'))
         return NestedServiceVariationSerializer(variations, many=True).data
 
     def get_image(self, obj):
-        image = ServiceImage.objects.filter(service=obj).first()
+        image = obj.images.first()  # Since `prefetch_related` preloads all related images
         return image.image.url if image else None
     
-class AllServiceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Service
-        fields = ['id','name','icon' ]
+class AllServiceSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    icon = serializers.SerializerMethodField()
+    def get_icon(self, obj):
+        if obj['random_icon']:
+            return self.context['request'].build_absolute_uri(obj['random_icon'])
+        return None
