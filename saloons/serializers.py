@@ -7,12 +7,12 @@ import pytz
 from openinghours.models import OpeningHour
 class SaloonSerializer(serializers.ModelSerializer):
     logo = serializers.ImageField(required=False)  
-    is_open=serializers.SerializerMethodField()
+    # is_open=serializers.SerializerMethodField()
     rating=serializers.SerializerMethodField()
     review_count=serializers.SerializerMethodField()
     class Meta:
         model = Saloon
-        fields = ['id','name','logo','address','banner','is_open','rating','review_count']
+        fields = ['id','name','logo','address','banner','rating','review_count']
 
         depth = 1
 
@@ -27,24 +27,24 @@ class SaloonSerializer(serializers.ModelSerializer):
 
     def get_logo(self, obj):
         return obj.logo.url if obj.logo else None 
-    def get_is_open(self, obj):
-        if not obj.is_open:
-            return False
-        tf = TimezoneFinder()
-        timezone_str = tf.timezone_at(lat=obj.lat, lng=obj.lng)
-        if not timezone_str:
-            raise ValueError("Could not determine timezone for the saloon location")
+    # def get_is_open(self, obj):
+    #     if not obj.is_open:
+    #         return False
+    #     tf = TimezoneFinder()
+    #     timezone_str = tf.timezone_at(lat=obj.lat, lng=obj.lng)
+    #     if not timezone_str:
+    #         raise ValueError("Could not determine timezone for the saloon location")
 
-        local_timezone = pytz.timezone(timezone_str)
-        local_now = datetime.now(local_timezone)
-        current_day = local_now.strftime('%A')
+    #     local_timezone = pytz.timezone(timezone_str)
+    #     local_now = datetime.now(local_timezone)
+    #     current_day = local_now.strftime('%A')
 
-        opening_hours = OpeningHour.objects.filter(day_of_week=current_day).first()
+    #     opening_hours = OpeningHour.objects.filter(day_of_week=current_day).first()
 
-        if not opening_hours or not opening_hours.is_open:
-            return False
+    #     if not opening_hours or not opening_hours.is_open:
+    #         return False
 
-        return opening_hours.start_time <= local_now.time() <= opening_hours.start_time
+    #     return opening_hours.start_time <= local_now.time() <= opening_hours.start_time
     
     
 class GallerySerializer(serializers.ModelSerializer):
@@ -58,44 +58,58 @@ class GallerySerializer(serializers.ModelSerializer):
 class PopularSaloonSerializer(serializers.ModelSerializer):
     appointments_count = serializers.IntegerField(read_only=True)
     review_count = serializers.IntegerField(read_only=True)
+    rating=serializers.SerializerMethodField()
     class Meta:
         model = Saloon
-        fields = ['id', 'name', 'logo','short_description','address','appointments_count','review_count','banner']
+        fields = ['id', 'name', 'logo','short_description','address','appointments_count','review_count','banner','rating']
+
+    def get_rating(self, obj):
+        reviews = obj.reviews.all()
+        if reviews:
+            return sum(review.rating for review in reviews) / len(reviews)
+        return 0
 
 class SaloonDetailSerializer(serializers.ModelSerializer):
     logo = serializers.ImageField(required=False)
-    is_open=serializers.SerializerMethodField()
+    # is_open=serializers.SerializerMethodField()
     amenities = serializers.SerializerMethodField()
+    rating=serializers.SerializerMethodField()
     class Meta:
         model = Saloon
-        fields = ['id','name','logo','short_description','long_description','address','banner','email','contact_no','website_link','facebook_link','instagram_link','lat','lng','is_open','amenities',]
+        fields = ['id','name','logo','short_description','long_description','address','banner','email','contact_no','website_link','facebook_link','instagram_link','lat','lng','amenities','rating']
 
         depth = 1
 
     def get_amenities(self, obj):
         return obj.amenities
 
+    def get_rating(self, obj):
+        reviews = obj.reviews.all()
+        if reviews:
+            return sum(review.rating for review in reviews) / len(reviews)
+        return 0
+
 
     def get_logo(self, obj):
         return obj.logo.url if obj.logo else None 
-    def get_is_open(self, obj):
-        if not obj.is_open:
-            return False
-        tf = TimezoneFinder()
-        timezone_str = tf.timezone_at(lat=obj.lat, lng=obj.lng)
-        if not timezone_str:
-            raise ValueError("Could not determine timezone for the saloon location")
+    # def get_is_open(self, obj):
+    #     if not obj.is_open:
+    #         return False
+    #     tf = TimezoneFinder()
+    #     timezone_str = tf.timezone_at(lat=obj.lat, lng=obj.lng)
+    #     if not timezone_str:
+    #         raise ValueError("Could not determine timezone for the saloon location")
 
-        local_timezone = pytz.timezone(timezone_str)
-        local_now = datetime.now(local_timezone)
-        current_day = local_now.strftime('%A')
+    #     local_timezone = pytz.timezone(timezone_str)
+    #     local_now = datetime.now(local_timezone)
+    #     current_day = local_now.strftime('%A')
 
-        opening_hours = OpeningHour.objects.filter(day_of_week=current_day).first()
+    #     opening_hours = OpeningHour.objects.filter(day_of_week=current_day).first()
 
-        if not opening_hours or not opening_hours.is_open:
-            return False
+    #     if not opening_hours or not opening_hours.is_open:
+    #         return False
 
-        return opening_hours.start_time <= local_now.time() <= opening_hours.end_time
+    #     return opening_hours.start_time <= local_now.time() <= opening_hours.end_time
     
 
 class SaloonListForMoreDealsSerializer(serializers.ModelSerializer):

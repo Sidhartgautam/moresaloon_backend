@@ -216,7 +216,12 @@ class PopularSaloonListView(generics.GenericAPIView):
         country_code = self.request.country_code
         filter_by = self.request.query_params.get('filter', 'all').lower()
         today = now().date()
-        queryset = Saloon.objects.filter(country__code=country_code).annotate(appointment_count=Count('appointment'))
+
+        # Annotate appointment_count and review_count
+        queryset = Saloon.objects.filter(country__code=country_code).annotate(
+            appointment_count=Count('appointment'),
+            review_count=Count('reviews')
+        )
 
         if filter_by == 'week':
             start_date = today - timedelta(days=7)
