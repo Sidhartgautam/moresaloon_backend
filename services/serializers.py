@@ -156,6 +156,7 @@ class AllServiceSerializer(serializers.Serializer):
     name = serializers.CharField()
     icon = serializers.SerializerMethodField()
     def get_icon(self, obj):
+        # If `random_icon` is a file path, construct the full URL
         if obj['random_icon']:
-            return self.context['request'].build_absolute_uri(obj['random_icon'])
+            return f"https://res.cloudinary.com/dvmqwrhbx/{obj['random_icon']}"
         return None

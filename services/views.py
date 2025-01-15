@@ -217,7 +217,7 @@ class AllServiceListView(generics.GenericAPIView):
             .annotate(
                 random_icon=Coalesce(Subquery(random_icon), None)  # Annotate with a random icon or None
             )
-            .order_by('name')  # Order alphabetically by name
+            .order_by('name')  
         )
         for services in queryset:
             print(services)
