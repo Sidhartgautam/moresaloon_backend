@@ -16,7 +16,7 @@ from pathlib import Path
 from datetime import timedelta 
 import os
 from dotenv import load_dotenv
-
+from core.utils.ckeditor import *
 
 
 
@@ -60,6 +60,8 @@ INSTALLED_APPS = [
     "corsheaders",
     'django_celery_beat',
     'taggit',
+    'django_ckeditor_5',
+    'ckeditor_uploader',
     
     
 
