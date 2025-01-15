@@ -9,9 +9,10 @@ class SaloonSerializer(serializers.ModelSerializer):
     logo = serializers.ImageField(required=False)  
     is_open=serializers.SerializerMethodField()
     rating=serializers.SerializerMethodField()
+    review_count=serializers.SerializerMethodField()
     class Meta:
         model = Saloon
-        fields = ['id','name','logo','address','banner','is_open','rating']
+        fields = ['id','name','logo','address','banner','is_open','rating','review_count']
 
         depth = 1
 
@@ -20,6 +21,9 @@ class SaloonSerializer(serializers.ModelSerializer):
         if reviews:
             return sum(review.rating for review in reviews) / len(reviews)
         return 0
+
+    def get_review_count(self, obj):
+        return obj.reviews.count()
 
     def get_logo(self, obj):
         return obj.logo.url if obj.logo else None 
