@@ -633,6 +633,50 @@ class WorkingDayListCreateView(generics.ListCreateAPIView):
         )
         return response.send(200)
 
+    # def post(self, request, *args, **kwargs):
+    #     saloon_id = self.kwargs.get('saloon_id')
+    #     staff_id = self.kwargs.get('staff_id')
+    #     saloon = get_object_or_404(Saloon, id=saloon_id)
+    #     staff = get_object_or_404(Staff, id=staff_id, saloon=saloon)
+
+    #     with transaction.atomic():
+    #         for day_name, hours in request.data.items():
+                
+    #             hours = request.data.get(day_name, None)
+
+    #             if not hours:
+    #                 hours = {
+    #                     'start_time': None,
+    #                     'end_time': None,
+    #                     'is_open': False
+    #                 }
+    #             else:
+    #                 if hours.get('start_time') == "":
+    #                     hours['start_time'] = None
+    #                 if hours.get('end_time') == "":
+    #                     hours['end_time'] = None
+                
+    #             day = day_name
+    #             hours['day_of_week'] = day
+
+    #             serializer = self.get_serializer(data=hours)
+                
+    #             if serializer.is_valid():
+    #                 serializer.save(staff=staff)
+    #             else:
+    #                 response = PrepareResponse(
+    #                     success=False,
+    #                     errors=serializer.errors,
+    #                     message=f'Error creating working hours for {day_name}'
+    #                 )
+    #                 return response.send(400)
+                
+
+    #     response = PrepareResponse(
+    #         success=True,
+    #         message='Working Hours created successfully'
+    #     )
+    #     return response.send(201)
     def post(self, request, *args, **kwargs):
         saloon_id = self.kwargs.get('saloon_id')
         staff_id = self.kwargs.get('staff_id')
@@ -641,7 +685,6 @@ class WorkingDayListCreateView(generics.ListCreateAPIView):
 
         with transaction.atomic():
             for day_name, hours in request.data.items():
-                
                 hours = request.data.get(day_name, None)
 
                 if not hours:
@@ -655,12 +698,41 @@ class WorkingDayListCreateView(generics.ListCreateAPIView):
                         hours['start_time'] = None
                     if hours.get('end_time') == "":
                         hours['end_time'] = None
-                
+
                 day = day_name
                 hours['day_of_week'] = day
 
+                # Fetch saloon's opening hours for the specific day
+                opening_hour = saloon.openinghour_set.filter(day_of_week=day_name).first()  # Use default reverse relation
+
+                if opening_hour:
+                    working_day_start_time = hours.get('start_time')
+                    working_day_end_time = hours.get('end_time')
+
+                    # Convert start_time and end_time to datetime.time objects
+                    if working_day_start_time:
+                        working_day_start_time = datetime.strptime(working_day_start_time, "%H:%M").time()
+                    if working_day_end_time:
+                        working_day_end_time = datetime.strptime(working_day_end_time, "%H:%M").time()
+
+                    # Validate working hours against saloon opening hours
+                    if working_day_start_time and working_day_end_time:
+                        if not (
+                            opening_hour.start_time <= working_day_start_time <= opening_hour.end_time
+                            and opening_hour.start_time <= working_day_end_time <= opening_hour.end_time
+                        ):
+                            response = PrepareResponse(
+                                success=False,
+                                message=(
+                                    f"Staff working hours for {day_name} must be within or equal to saloon's opening hours "
+                                    f"({opening_hour.start_time} - {opening_hour.end_time})."
+                                ),
+                                errors={'non_field_errors': [f"Invalid working hours for {day_name}"]}
+                            )
+                            return response.send(400)
+
                 serializer = self.get_serializer(data=hours)
-                
+
                 if serializer.is_valid():
                     serializer.save(staff=staff)
                 else:
