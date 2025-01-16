@@ -5,6 +5,7 @@ from country.models import Country,Currency
 from taggit.managers import TaggableManager
 from django.contrib.postgres.fields import ArrayField
 from core.utils.slugify import unique_slug_generator
+from core.utils.compression_image import compress_image
 
 class Saloon(models.Model):
     id = models.UUIDField(
@@ -41,6 +42,10 @@ class Saloon(models.Model):
     def save(self, *args, **kwargs):
         if self.slug is None:
             self.slug=unique_slug_generator(self)
+        if self.logo:
+            self.logo = compress_image(self.logo)
+        if self.banner:
+            self.banner = compress_image(self.banner)
         super().save(*args, **kwargs)
 
 class Gallery(models.Model):
