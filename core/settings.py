@@ -274,7 +274,7 @@ SIMPLE_JWT = {
 
 SSO_SERVICE_URL = 'https://moretrek.com/api/'
 
-CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8000/', 'https://salon.moretechglobal.com']
+CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8000/', 'https://salon.moretechglobal.com','https://www.moredealsclub.com','https://moresalons.com','https://admin-panel-tau-drab.vercel.app','https://web-production-f5d1.up.railway.app']
 EMAIL_BACKEND = config('EMAIL_BACKEND')
 EMAIL_HOST = config('EMAIL_HOST')
 EMAIL_PORT = config('EMAIL_PORT', cast=int)
