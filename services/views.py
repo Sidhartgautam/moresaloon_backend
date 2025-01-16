@@ -209,18 +209,18 @@ class AllServiceListView(generics.GenericAPIView):
     def get_queryset(self):
         # Subquery to get a random icon for each service name
         random_icon = Service.objects.filter(
-            name=OuterRef('name')
-        ).order_by('?').values('icon')[:1]  # '?' tells Django to order randomly
+            name=OuterRef('name')  # Match service name
+        ).order_by('?').values('icon')[:1]  # Pick one random icon
 
+        # Main queryset with distinct service names and their random icon
         queryset = (
-            Service.objects.values('name')
+            Service.objects.values('name')  # Fetch unique service names
             .annotate(
-                random_icon=Coalesce(Subquery(random_icon), None)  # Annotate with a random icon or None
+                random_icon=Subquery(random_icon)  # Assign a random icon to each name
             )
-            .order_by('name')  
+            .distinct('name')  # Ensure distinct names
+            .order_by('name')  # Order alphabetically
         )
-        for services in queryset:
-            print(services)
         return queryset
 
     def get(self, request, *args, **kwargs):

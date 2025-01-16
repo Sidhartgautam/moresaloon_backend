@@ -7,7 +7,7 @@ from rest_framework.generics import GenericAPIView
 from .search import search
 from fuzzywuzzy import process
 from saloons.serializers import SaloonSerializer
-from services.serializers import ServiceSerializer, NestedServiceVariationSerializer
+from services.serializers import SearchServiceSerializer, NestedServiceVariationSerializer
 from staffs.serializers import StaffSerializer
 
 class SearchView(GenericAPIView):
@@ -40,7 +40,7 @@ class SearchView(GenericAPIView):
             return Response({'message': 'No results found'}, status=status.HTTP_200_OK)
 
         saloon_serializer = SaloonSerializer(results.get('saloons', []), many=True)
-        service_serializer = ServiceSerializer(results.get('services', []), many=True)
+        service_serializer = SearchServiceSerializer(results.get('services', []), many=True)
         staff_serializer = StaffSerializer(results.get('staff', []), many=True)
         service_variation_serializer = NestedServiceVariationSerializer(results.get('service_variations', []), many=True)
 

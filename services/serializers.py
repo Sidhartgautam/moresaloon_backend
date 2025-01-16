@@ -149,14 +149,23 @@ class NestedServiceSerializer(serializers.ModelSerializer):
         return NestedServiceVariationSerializer(variations, many=True).data
 
     def get_image(self, obj):
-        image = obj.images.first()  # Since `prefetch_related` preloads all related images
+        image = obj.images.first() 
         return image.image.url if image else None
     
 class AllServiceSerializer(serializers.Serializer):
     name = serializers.CharField()
     icon = serializers.SerializerMethodField()
     def get_icon(self, obj):
-        # If `random_icon` is a file path, construct the full URL
-        if obj['random_icon']:
-            return f"https://res.cloudinary.com/dvmqwrhbx/{obj['random_icon']}"
+        random_icon = obj.get('random_icon', None)
+        if random_icon:
+            # Construct full URL if random_icon is a valid path
+            return f"https://res.cloudinary.com/dvmqwrhbx/{random_icon}"
         return None
+    
+class SearchServiceSerializer(serializers.ModelSerializer):
+    saloon_name=serializers.CharField(source='saloon.name')
+    saloon_id=serializers.CharField(source='saloon.id')
+    class Meta:
+        model = Service
+        fields = ['id', 'name', 'icon','saloon_name','saloon_id']
+    
