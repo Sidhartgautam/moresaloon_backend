@@ -42,10 +42,10 @@ class Saloon(models.Model):
     def save(self, *args, **kwargs):
         if self.slug is None:
             self.slug=unique_slug_generator(self)
-        if self.logo:
-            self.logo = compress_image(self.logo)
-        if self.banner:
-            self.banner = compress_image(self.banner)
+        if self.logo and hasattr(self.logo, 'file'):
+            self.logo = compress_image(self.logo.file)
+        if self.banner and hasattr(self.banner, 'file'):
+            self.banner = compress_image(self.banner.file)
         super().save(*args, **kwargs)
 
 class Gallery(models.Model):
