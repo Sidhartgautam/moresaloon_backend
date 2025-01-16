@@ -161,10 +161,11 @@ class ServiceSerializer(serializers.ModelSerializer):
     logo=serializers.SerializerMethodField(read_only=True)
     variations = ServiceVariationSerializer(many=True, required=False)
     logo=serializers.SerializerMethodField(read_only=True)
+    icon=serializers.ImageField(required=True)
 
     class Meta:
         model = Service
-        fields = ['id', 'name','logo', 'variations']
+        fields = ['id', 'name','logo', 'variations','icon']
 
     def get_logo(self, obj):
         if obj.saloon and obj.saloon.logo:
@@ -200,6 +201,7 @@ class ServiceSerializer(serializers.ModelSerializer):
         instance.description = validated_data.get('description', instance.description)
         instance.min_duration = validated_data.get('min_duration', instance.min_duration)
         instance.max_duration = validated_data.get('max_duration', instance.max_duration)
+        instance.icon=validated_data.get('icon', instance.icon)
         instance.save()
         instance.images.all().delete()
         for image_data in images_data:
