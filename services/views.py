@@ -175,9 +175,34 @@ class ServiceVariationListView(generics.GenericAPIView):
         )
         return response.send(code=200)
     
-class NestedServiceListView(generics.GenericAPIView):
+# class NestedServiceListView(generics.GenericAPIView):
+#     serializer_class = NestedServiceSerializer
+#     # permission_classes = [IsAuthenticated]
+
+#     def get_queryset(self):
+#         country_code = self.request.country_code
+#         saloon_id = self.kwargs.get('saloon_id')
+#         if saloon_id:
+#             return Service.objects.filter(
+#                 saloon_id=saloon_id,
+#                 saloon__country__code=country_code
+#             ).select_related('saloon', 'saloon__country').prefetch_related(
+#                 Prefetch('variations', queryset=ServiceVariation.objects.all()),
+#                 Prefetch('images', queryset=ServiceImage.objects.all())
+#             )
+#         return Service.objects.none()
+
+#     def get(self, request, *args, **kwargs):
+#         queryset = self.get_queryset()
+#         serializer = self.get_serializer(queryset, many=True, context={'saloon': self.kwargs.get('saloon_id')})
+#         response = PrepareResponse(
+#             success=True,
+#             data=serializer.data,
+#             message="Services fetched successfully"
+#         )
+#         return response.send(code=200)
+class NestedServiceListView(generics.ListAPIView):
     serializer_class = NestedServiceSerializer
-    # permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         country_code = self.request.country_code
@@ -187,12 +212,12 @@ class NestedServiceListView(generics.GenericAPIView):
                 saloon_id=saloon_id,
                 saloon__country__code=country_code
             ).select_related('saloon', 'saloon__country').prefetch_related(
-                Prefetch('variations', queryset=ServiceVariation.objects.all()),
+                Prefetch('variations', queryset=ServiceVariation.objects.prefetch_related('images')),
                 Prefetch('images', queryset=ServiceImage.objects.all())
             )
         return Service.objects.none()
 
-    def get(self, request, *args, **kwargs):
+    def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True, context={'saloon': self.kwargs.get('saloon_id')})
         response = PrepareResponse(

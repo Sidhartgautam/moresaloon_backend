@@ -42,6 +42,7 @@ class BookAppointmentAPIView(APIView):
             ).send(400)
 
         validated_data = serializer.validated_data
+        print("validated data", validated_data)
 
         start_time = validated_data['start_time']
         saloon_id = validated_data['saloon_id']
@@ -92,7 +93,7 @@ class BookAppointmentAPIView(APIView):
             total_price -= discount_amount
 
         try:
-            payment_status, message = self.process_payment(
+            payment_status, message, data = self.process_payment(
                 request=request,
                 payment_method=validated_data.get('payment_method'),
                 amount=total_price,
@@ -101,6 +102,7 @@ class BookAppointmentAPIView(APIView):
                 saloon=saloon,
                 data=data
             )
+            print("Data", data)
         except ValidationError as e:
             return PrepareResponse(
                 success=False,
@@ -130,7 +132,10 @@ class BookAppointmentAPIView(APIView):
                 fullname=validated_data['fullname'],
                 email=validated_data['email'],
                 phone_number=validated_data['phone_number'],
-                note=validated_data['note']
+                note=validated_data['note'],
+                user_send_amount=data['user_send_amount'],
+                transaction_id=data['transaction_id'],
+                refferal_points_id=data['refferal_points_id'],
             )
             appointment.save()
 
@@ -183,8 +188,8 @@ class BookAppointmentAPIView(APIView):
                 raise ValidationError(str(e))
         elif payment_method == 'moredeals':
             try:
-                moredeals_status, message = self.process_moredeals_payment(request,amount,saloon, payment_method, data)
-                return moredeals_status, message
+                moredeals_status, message, data = self.process_moredeals_payment(request,amount,saloon, payment_method, data)
+                return moredeals_status, message, data
             except Exception as e:
                 raise ValidationError(str(e))
 
@@ -248,7 +253,8 @@ class BookAppointmentAPIView(APIView):
             'platform':'moresaloon'
         }, headers={'Authorization': f"{access_token}"})
         if response.status_code == 200:
-            return True, "Success"
+            print(response.json())
+            return True, "Success", response.json()['data']
         else:
             errors = response.json()['errors']['non_field_errors'][0]
             return False, errors

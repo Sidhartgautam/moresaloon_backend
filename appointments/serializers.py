@@ -85,6 +85,9 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
     phone_number = serializers.CharField()
     note = serializers.CharField(allow_blank=True, allow_null=True)
     currency = serializers.CharField(read_only=True)
+    user_send_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    transaction_id = serializers.CharField(read_only=True)
+    refferal_points_id = serializers.CharField(read_only=True)
 
     class Meta:
         model = Appointment
@@ -106,6 +109,9 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
             'note',
             'currency',
             'coupon_code',
+            'user_send_amount',
+            'transaction_id',
+            'refferal_points_id'
         ]
 
     def validate(self, data):

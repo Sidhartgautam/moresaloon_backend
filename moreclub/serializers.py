@@ -123,14 +123,19 @@ class ServiceVariationImageSerializer(serializers.ModelSerializer):
 
 class ServiceVariationInfoSerializer(serializers.ModelSerializer):
     price=serializers.SerializerMethodField()
+    image=serializers.SerializerMethodField()
     class Meta:
         model = ServiceVariation
-        fields = ['id', 'name','duration', 'price']
+        fields = ['id', 'name','duration', 'price','image']
     def get_price(self, obj):
         if obj.discount_price:
             return obj.discount_price
         else:
             return obj.price
+
+    def get_image(self, obj):
+        image = obj.images.first()
+        return image.image.url if image else None
 
 class ServiceVariationSerializer(serializers.ModelSerializer):
     images = ServiceVariationImageSerializer(many=True, read_only=True)
@@ -339,9 +344,10 @@ class AppointmentDetailsSerializer(serializers.ModelSerializer):
     service=ServicesInfoSerializer()
     staff=StaffInfoSerializer()
     user=serializers.SerializerMethodField()
+    currency = serializers.ReadOnlyField(source='service.saloon.currency.symbol')
     class Meta:
         model = Appointment
-        fields = ['id','appointment_id','user','staff','service_variation','service', 'start_time', 'end_time', 'fullname','currency','email','phone_number','date','total_price','status','payment_status','payment_method','created_at']
+        fields = ['id','appointment_id','user','staff','service_variation','service','user_send_amount', 'start_time', 'end_time', 'fullname','currency','email','phone_number','date','total_price','status','payment_status','payment_method','created_at']
     def get_service_variation(self, obj):
         service_variations = ServiceVariation.objects.filter(id__in=obj.service_variation.all())
         return ServiceVariationInfoSerializer(service_variations, many=True).data
@@ -349,7 +355,6 @@ class AppointmentDetailsSerializer(serializers.ModelSerializer):
     def get_user(self, obj):
         user = obj.user
         return f"{user.first_name} {user.last_name}" if user else "Unknown"
-
 ####################################Offers#####################################################
 
 class SaloonOffersSerializer(serializers.ModelSerializer):
@@ -420,24 +425,15 @@ class SaloonCouponsSerializer(serializers.ModelSerializer):
         return data
     
     def create(self, validated_data):
-    # Retrieve saloon_id from the request context
         saloon_id = self.context['request'].parser_context['kwargs'].get('saloon_id')
         if not saloon_id:
             raise serializers.ValidationError({"saloon": "Saloon ID is required."})
-
-        # Fetch the saloon instance
         try:
             saloon = Saloon.objects.get(id=saloon_id)
         except Saloon.DoesNotExist:
             raise serializers.ValidationError({"saloon": "Invalid saloon ID."})
-
-        # Remove services from validated data to set it later
         service_ids = validated_data.pop('services', [])
-        
-        # Create the coupon
         coupon = SaloonCoupons.objects.create(saloon=saloon, **validated_data)
-        
-        # Associate services
         if service_ids:
             coupon.services.set(service_ids)
         
