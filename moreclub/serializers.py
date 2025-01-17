@@ -355,10 +355,6 @@ class AppointmentDetailsSerializer(serializers.ModelSerializer):
     def get_user(self, obj):
         user = obj.user
         return f"{user.first_name} {user.last_name}" if user else "Unknown"
-
-    def get_user_paid_amount(self, obj):
-        return obj.user_paid_amount
-
 ####################################Offers#####################################################
 
 class SaloonOffersSerializer(serializers.ModelSerializer):
