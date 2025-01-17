@@ -145,6 +145,6 @@ class CheckCouponValidityAPIView(APIView):
         except SaloonCoupons.DoesNotExist:
             return PrepareResponse(
                 success=False,
-                message="Invalid coupon code or saloon ID."
+                message="I think the coupon doesn't exist or belong to this saloon."
             ).send(404)
 
