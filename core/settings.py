@@ -35,8 +35,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-58pn7pvl9xa3i5)0%@)89or60py7a0^0h+!*)x6h=pilpr40!5'
 
 #STRIPE_SECRET_KEY
-STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY')
-
+# STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY')
+STRIPE_SECRET_KEY = 'sk_test_51PVVTiElmm3JCcEkFYmmxaiAaBAQ3CkW8pVFPh5VvtaUqErCojPFNh5uof3O4JuaeJse9MAMNqOeHKQrkpmABUH300ubJA7F3L'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 

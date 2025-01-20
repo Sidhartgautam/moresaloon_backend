@@ -27,7 +27,8 @@ class CreatePaymentIntentView(generics.GenericAPIView):
                 'price': total_price  
             }
             print("price: ", total_price)
-            url = f"https://moretrek.com/api/payments/all/stripe/create-payment-intent/"
+            # url = f"https://moretrek.com/api/payments/all/stripe/create-payment-intent/"
+            url=f"http://192.168.1.72:8000/api/payments/all/stripe/create-payment-intent/"
             response = requests.post(url, data={
                 'currency': currency,
                 'payment_method': payment_method,

@@ -53,7 +53,7 @@ requests==2.32.3
 rpds-py==0.21.0
 six==1.16.0
 sqlparse==0.5.2
-stripe==11.3.0
+stripe==10.9.0
 timezonefinder==6.5.5
 typing_extensions==4.12.2
 tzdata==2024.2

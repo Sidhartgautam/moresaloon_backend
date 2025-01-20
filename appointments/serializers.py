@@ -88,6 +88,7 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
     user_send_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     transaction_id = serializers.CharField(read_only=True)
     refferal_points_id = serializers.CharField(read_only=True)
+    payment_method_id = serializers.CharField(write_only=True,required=False,allow_blank=True)
 
     class Meta:
         model = Appointment
@@ -101,6 +102,7 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
             'end_time',
             'payment_status',
             'payment_method',
+            'payment_method_id',
             'total_price',
             'buffer_time',
             'fullname',
@@ -124,8 +126,6 @@ class AppointmentPlaceSerializer(serializers.ModelSerializer):
         coupon_code = data.get('coupon_code')
         # buffer_time = data.get('buffer_time')
         user = self.context['request'].user
-
-        print("validated_data", data)
 
         if coupon_code:
             try:
