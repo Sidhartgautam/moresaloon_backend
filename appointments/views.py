@@ -30,6 +30,7 @@ import random
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
+
 class BookAppointmentAPIView(APIView):
     def post(self, request, *args, **kwargs):
         data = request.data
@@ -263,7 +264,7 @@ class BookAppointmentAPIView(APIView):
             ).send(400)
         
 
-        url = f"https://192.168.1.72:8000/api/payments/payment-through-balance/"
+        url = f"https://moretrek.com/api/payments/payment-through-balance/"
         access_token = get_moredeals_token(request)
         
         response = requests.post(url, data={
