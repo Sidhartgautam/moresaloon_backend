@@ -152,5 +152,5 @@ class SearchServiceSerializer(serializers.ModelSerializer):
     saloon_id=serializers.CharField(source='saloon.id')
     class Meta:
         model = Service
-        fields = ['id', 'name', 'icon','saloon_name','saloon_id']
+        fields = ['id', 'name', 'icon','saloon_name','saloon_id','slug']
     

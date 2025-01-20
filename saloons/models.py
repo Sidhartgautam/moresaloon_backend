@@ -5,6 +5,7 @@ from country.models import Country,Currency
 from taggit.managers import TaggableManager
 from django.contrib.postgres.fields import ArrayField
 from core.utils.slugify import unique_slug_generator
+import pytz
 from core.utils.compression_image import compress_image
 
 class Saloon(models.Model):
@@ -36,6 +37,13 @@ class Saloon(models.Model):
     )
     is_open= models.BooleanField(default=True)
     slug= models.SlugField( null=True, blank=True)
+    timezone = models.CharField(
+        max_length=50,
+        choices=[(tz, tz) for tz in pytz.all_timezones],
+        default='UTC',
+        null=True,
+        blank=True
+    )
 
     def __str__(self):
         return self.name

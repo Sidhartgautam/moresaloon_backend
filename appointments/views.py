@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from core.utils.response import PrepareResponse
 from django.utils.dateparse import parse_date
 from users.models import User
+from django.utils import timezone
 from offers.models import CouponUsage
 from core.utils.moredealstoken import get_moredeals_token
 from django.db import transaction
@@ -14,6 +15,7 @@ from staffs.models import BreakTime
 from datetime import datetime
 from services.models import Service, ServiceVariation
 from staffs.models import Staff, WorkingDay
+from core.utils.fetch_slot import fetch_available_slots
 from django.conf import settings
 from django.core.mail import send_mail
 from rest_framework.exceptions import ValidationError
@@ -31,7 +33,6 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 class BookAppointmentAPIView(APIView):
     def post(self, request, *args, **kwargs):
         data = request.data
-
         serializer = AppointmentPlaceSerializer(data=data, context={'request': request})
 
         if not serializer.is_valid():
@@ -61,6 +62,7 @@ class BookAppointmentAPIView(APIView):
                 message="Invalid saloon, service, or staff.",
                 errors={"non_field_errors": ["Invalid data provided."]}
             ).send(400)
+
         buffer_time = staff.buffer_time
 
         # Calculate the start time and end time
@@ -80,29 +82,90 @@ class BookAppointmentAPIView(APIView):
         total_price = calculate_total_appointment_price(service_variations_ids)
         coupon = validated_data.get('coupon')
         discount_amount = 0
+
         if coupon:
             if CouponUsage.objects.filter(coupon=coupon, user=request.user).exists():
-                    return PrepareResponse(
-                        success=False,
-                        message="You have already used this coupon."
-                    ).send(400)
+                return PrepareResponse(
+                    success=False,
+                    message="You have already used this coupon."
+                ).send(400)
+
             if coupon.percentage_discount:
                 discount_amount = (total_price * coupon.percentage_discount) / 100
             elif coupon.fixed_discount:
                 discount_amount = min(coupon.fixed_discount, total_price)
+
             total_price -= discount_amount
 
         try:
-            payment_status, message, data = self.process_payment(
-                request=request,
-                payment_method=validated_data.get('payment_method'),
-                amount=total_price,
-                user=request.user if request.user.is_authenticated else None,
-                payment_method_id=validated_data.get('payment_method_id'),
-                saloon=saloon,
-                data=data
-            )
-            print("Data", data)
+            with transaction.atomic():
+                # Create the appointment
+                minimum = pow(10, 10 - 1)
+                maximum = pow(10, 10) - 1
+                unique_id = random.randint(minimum, maximum)
+
+                appointment = Appointment(
+                    user=request.user if request.user.is_authenticated else None,
+                    saloon=saloon,
+                    service=service,
+                    appointment_id=unique_id,
+                    staff=staff,
+                    date=validated_data['date'],
+                    start_time=start_time,
+                    end_time=end_time,
+                    payment_method=validated_data.get('payment_method'),
+                    payment_status='Pending',
+                    total_price=total_price,
+                    coupon=coupon,
+                    fullname=validated_data['fullname'],
+                    email=validated_data['email'],
+                    phone_number=validated_data['phone_number'],
+                    note=validated_data['note'],
+                )
+                appointment.save()
+                appointment.service_variation.add(*service_variations_ids)
+
+                # Apply coupon usage
+                if coupon:
+                    CouponUsage.objects.create(
+                        coupon=coupon,
+                        user=request.user,
+                        appointment=appointment
+                    )
+
+                # Process payment
+                payment_status, message, data = self.process_payment(
+                    request=request,
+                    payment_method=validated_data.get('payment_method'),
+                    amount=total_price,
+                    user=request.user if request.user.is_authenticated else None,
+                    payment_method_id=validated_data.get('payment_method_id'),
+                    saloon=saloon,
+                    data=data
+                )
+
+                if not payment_status:
+                    raise ValueError("Payment processing failed.")
+
+                # Update appointment with payment details
+                appointment.payment_status = payment_status
+                if data:
+                    appointment.user_send_amount = data.get('user_send_amount', 0)
+                    appointment.transaction_id = data.get('transaction_id', 0)
+                    appointment.refferal_points_id = data.get('refferal_points_id', 0)
+                appointment.save()
+
+                # Send confirmation emails
+                send_confirmation_email(appointment)
+                staff_confirmation_email(appointment)
+                salon_confirmation_email(appointment)
+
+            return PrepareResponse(
+                success=True,
+                message="Appointment booked successfully.",
+                data=serializer.data
+            ).send(200)
+
         except ValidationError as e:
             return PrepareResponse(
                 success=False,
@@ -110,80 +173,34 @@ class BookAppointmentAPIView(APIView):
                 errors={"payment_errors": str(e)}
             ).send(400)
 
-        if payment_status:
-            # Create appointment slot on the fly
-            minimum = pow(10, 10 - 1)
-            maximum = pow(10, 10) - 1
-            unique_id = random.randint(minimum, maximum)
-
-            appointment = Appointment(
-                user=request.user if request.user.is_authenticated else None,
-                saloon=saloon,
-                service=service,
-                appointment_id=unique_id,
-                staff=staff,
-                date=validated_data['date'],
-                start_time=start_time,
-                end_time=end_time,
-                payment_method=validated_data.get('payment_method'),
-                payment_status=payment_status,
-                total_price=total_price,
-                coupon=coupon,
-                fullname=validated_data['fullname'],
-                email=validated_data['email'],
-                phone_number=validated_data['phone_number'],
-                note=validated_data['note'],
-                user_send_amount=data['user_send_amount'],
-                transaction_id=data['transaction_id'],
-                refferal_points_id=data['refferal_points_id'],
-            )
-            appointment.save()
-
-            appointment.service_variation.add(*service_variations_ids)
-            if coupon:
-                CouponUsage.objects.create(
-                    coupon=coupon,
-                    user=request.user,
-                    appointment=appointment
-                )
-            send_confirmation_email(appointment)
-            staff_confirmation_email(appointment)
-            salon_confirmation_email(appointment)
-
-
-            return PrepareResponse(
-                success=True,
-                message="Appointment booked successfully.",
-                data=serializer.data
-            ).send(200)
-        else:
+        except Exception as e:
             return PrepareResponse(
                 success=False,
-                message=f"Payment failed",
-                data={"non_field_errors": [message]},
-            ).send(400)
-    
+                message="An error occurred while booking the appointment.",
+                errors={"non_field_errors": [str(e)]}
+            ).send(500)
     
     def process_payment(self, request, payment_method, amount, user, payment_method_id, saloon, data):
         if payment_method == 'coa':
-            return 'Unpaid', "Success"
+            return 'Unpaid', "Success", None
         elif payment_method =='stripe':
             try:
                 payment_intent = request.data.get('payment_intent')
                 if not payment_intent:
-                    raise ValueError("Payment intent not provided")
+                    return "Payment intent not provided", False, None
 
                 payment_intent = stripe.PaymentIntent.confirm(
                     payment_intent,
                       payment_method=payment_method_id,
                       return_url='http://127.0.0.1:8000/appointments/book'
                       )
-                print("payment_intent: ", payment_intent)
 
                 if payment_intent['status'] != 'succeeded':
                     raise ValueError(f"Payment failed with status: {payment_intent['status']}")
+                    
                 else:
-                    return self.stripe_payment(request,amount,saloon, payment_method_id)
+                    moredeals_status, message, data = self.stripe_payment(request,amount,saloon, payment_method_id)
+                    return moredeals_status, message, data
             except stripe.error.CardError as e:
                 raise ValidationError(str(e))
         elif payment_method == 'moredeals':
@@ -192,17 +209,21 @@ class BookAppointmentAPIView(APIView):
                 return moredeals_status, message, data
             except Exception as e:
                 raise ValidationError(str(e))
+            
+    def get_auth_headers(self, request):
+        auth_header=request.headers.get('Authorization')
+        return {'Authorization': auth_header} if auth_header else {}
 
     def stripe_payment(self,request,amount,saloon, payment_method_id):
         try:
             payment_method_get = stripe.PaymentMethod.retrieve(payment_method_id)
             payer_detail = self.get_payer_detail(payment_method_get)
             
-            url = "http://192.168.1.73:8000/api/payments/payment-through-stripe/"
+            url = "http://192.168.1.72:8000/api/payments/payment-through-stripe/"
             
             response = requests.post(
                 url,
-                json={
+                data={
                 'amount': amount,
                 'payer_detail': payer_detail,
                 "brand": payment_method_get['type'],
@@ -210,11 +231,12 @@ class BookAppointmentAPIView(APIView):
                 'from_project': 'moresaloon',
                 'currency_code': saloon.currency.currency_code
                 },
-                headers={'Content-Type': 'application/json'}
+                headers=self.get_auth_headers(request)
             )
             if response.status_code == 200:
-                payment_data = response.json()
-                return 'Paid'
+                payment_data = response.json()['data']
+
+                return 'Paid', "Payment processed successfully", payment_data
             else:
                 raise ValidationError("Payment failed: {}".format(response.json().get('error', 'Unknown error')))
 
@@ -241,7 +263,7 @@ class BookAppointmentAPIView(APIView):
             ).send(400)
         
 
-        url = f"https://moretrek.com/api/payments/payment-through-balance/"
+        url = f"https://192.168.1.72:8000/api/payments/payment-through-balance/"
         access_token = get_moredeals_token(request)
         
         response = requests.post(url, data={
@@ -492,26 +514,34 @@ class StaffAppointmentsListAPIView(generics.GenericAPIView):
 #         staff_id = self.kwargs.get('staff_id')
 #         date = self.request.query_params.get('date')
 #         service_variations = self.request.query_params.getlist('service_variation', [])
-#         print(service_variations)
+
+#         # Check if service_variation is provided
+#         if not service_variations:
+#             print("No service variations provided.")
+#             return []
 
 #         if not date:
 #             return []
-        
+
 #         try:
 #             date_obj = datetime.strptime(date, "%Y-%m-%d").date()
 #         except ValueError:
 #             return []
 
+#         # Get the staff and check if they are on holiday
+#         staff = get_object_or_404(Staff, id=staff_id)
+#         if staff.is_holiday:
+#             print(f"Staff {staff.name} is on holiday.")
+#             return []  # Return empty if staff is on holiday
+
 #         # Get the day name based on the date
 #         day_name = date_obj.strftime("%A")
-#         staff = get_object_or_404(Staff, id=staff_id)
 
 #         # Get booked appointments to avoid overlapping slots
 #         booked_appointments = Appointment.objects.filter(staff_id=staff_id, date=date).values_list('start_time', 'end_time')
 
 #         available_slots = []
 #         buffer_time = staff.buffer_time or timedelta(minutes=10)  # Default buffer time
-#         print(day_name)
 
 #         # Get staff working hours for that day
 #         working_day = staff.working_days.filter(day_of_week=day_name).first()
@@ -519,10 +549,13 @@ class StaffAppointmentsListAPIView(generics.GenericAPIView):
 #             print(f"No working day found for {day_name}")
 #             return []
 
+#         # Check if working day has valid start and end times
+#         if not working_day.start_time or not working_day.end_time:
+#             print(f"Working day {day_name} found, but missing start or end time.")
+#             return []
+
 #         current_time = working_day.start_time
 #         end_time = working_day.end_time
-
-#         print(f"Staff working hours: {current_time} to {end_time}")
 
 #         # Calculate total duration from service variations
 #         total_duration = timedelta()
@@ -530,12 +563,10 @@ class StaffAppointmentsListAPIView(generics.GenericAPIView):
 #             svd = ServiceVariation.objects.get(id=sv)
 #             total_duration += svd.duration
 
-#         print(f"Total duration of services: {total_duration}")
 #         while current_time < end_time:
 #             slot_end_time = (datetime.combine(datetime.today(), current_time) + total_duration + buffer_time).time()
 
 #             if slot_end_time > end_time:
-#                 print(f"Slot end time {slot_end_time} exceeds working hours.")
 #                 break
 
 #             # Check if the slot overlaps with any booked appointment
@@ -551,10 +582,8 @@ class StaffAppointmentsListAPIView(generics.GenericAPIView):
 #                     'end_time': slot_end_time,
 #                     'service_variations': service_variations,
 #                 })
-#                 print(f"Available slot: {current_time} to {slot_end_time}")
-#             else:
-#                 print(f"Slot {current_time} to {slot_end_time} overlaps with an existing appointment.")
 #             current_time = (datetime.combine(datetime.today(), current_time) + total_duration + buffer_time).time()
+            
 
 #         return available_slots
 
@@ -591,116 +620,98 @@ class StaffAppointmentsListAPIView(generics.GenericAPIView):
 #             message="Available slots fetched successfully.",
 #             data=serializer.data
 #         ).send(200)
-class AvailableSlotListAPIView(generics.GenericAPIView):
-    serializer_class = AvailableSlotSerializer
 
-    def get_queryset(self):
-        staff_id = self.kwargs.get('staff_id')
-        date = self.request.query_params.get('date')
-        service_variations = self.request.query_params.getlist('service_variation', [])
+class AvailableSlotListAPIView(APIView):
+    def get(self, request, *args, **kwargs):
+        staff_id = self.kwargs.get("staff_id")
+        saloon_id = self.request.query_params.get("saloon_id")
+        date_str = request.query_params.get("date")
+        service_variations = request.query_params.getlist("service_variation", [])
 
-        # Check if service_variation is provided
-        if not service_variations:
-            print("No service variations provided.")
-            return []
-
-        if not date:
-            return []
+        # Debugging logs
+        print(f"DEBUG: Staff ID: {staff_id}")
+        print(f"DEBUG: Saloon ID: {saloon_id}")
+        print(f"DEBUG: Date: {date_str}")
+        print(f"DEBUG: Service Variations: {service_variations}")
 
         try:
-            date_obj = datetime.strptime(date, "%Y-%m-%d").date()
-        except ValueError:
-            return []
-
-        # Get the staff and check if they are on holiday
-        staff = get_object_or_404(Staff, id=staff_id)
-        if staff.is_holiday:
-            print(f"Staff {staff.name} is on holiday.")
-            return []  # Return empty if staff is on holiday
-
-        # Get the day name based on the date
-        day_name = date_obj.strftime("%A")
-
-        # Get booked appointments to avoid overlapping slots
-        booked_appointments = Appointment.objects.filter(staff_id=staff_id, date=date).values_list('start_time', 'end_time')
-
-        available_slots = []
-        buffer_time = staff.buffer_time or timedelta(minutes=10)  # Default buffer time
-
-        # Get staff working hours for that day
-        working_day = staff.working_days.filter(day_of_week=day_name).first()
-        if not working_day:
-            print(f"No working day found for {day_name}")
-            return []
-
-        # Check if working day has valid start and end times
-        if not working_day.start_time or not working_day.end_time:
-            print(f"Working day {day_name} found, but missing start or end time.")
-            return []
-
-        current_time = working_day.start_time
-        end_time = working_day.end_time
-
-        # Calculate total duration from service variations
-        total_duration = timedelta()
-        for sv in service_variations:
-            svd = ServiceVariation.objects.get(id=sv)
-            total_duration += svd.duration
-
-        while current_time < end_time:
-            slot_end_time = (datetime.combine(datetime.today(), current_time) + total_duration + buffer_time).time()
-
-            if slot_end_time > end_time:
-                break
-
-            # Check if the slot overlaps with any booked appointment
-            overlapping_appointments = [
-                (start_time, end_time)
-                for start_time, end_time in booked_appointments
-                if not (slot_end_time <= start_time or current_time >= end_time)
-            ]
-
-            if not overlapping_appointments:
-                available_slots.append({
-                    'start_time': current_time,
-                    'end_time': slot_end_time,
-                    'service_variations': service_variations,
-                })
-            current_time = (datetime.combine(datetime.today(), current_time) + total_duration + buffer_time).time()
-            
-
-        return available_slots
-
-    def get(self, request, *args, **kwargs):
-        date = self.request.query_params.get('date')
-        now_date = datetime.now().date()
-        if date:
-            try:
-                query_date = datetime.strptime(date, "%Y-%m-%d").date()
-                if query_date < now_date:
-                    return PrepareResponse(
-                        success=False,
-                        message="The requested date is in the past.",
-                        data=None
-                    ).send(400)
-            except ValueError:
-                return PrepareResponse(
-                    success=False,
-                    message="Invalid date format provided. Use 'YYYY-MM-DD'.",
-                    data=None
-                ).send(400)
-
-        queryset = self.get_queryset()
-        if not queryset:
+            date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            print(f"DEBUG: Parsed Date: {date}")
+        except (ValueError, TypeError):
+            print(f"DEBUG: Invalid date format: {date_str}")
             return PrepareResponse(
                 success=False,
-                message="No available slots found.",
-                data=None
+                message="Invalid date format provided. Use 'YYYY-MM-DD'.",
+                data=None,
+            ).send(400)
+
+        if not service_variations:
+            print("DEBUG: No service variations provided.")
+            return PrepareResponse(
+                success=False,
+                message="No service variations provided.",
+                data=None,
+            ).send(400)
+
+        # Get saloon and staff details
+        try:
+            saloon = Saloon.objects.get(id=saloon_id)
+            print(f"DEBUG: Saloon Timezone: {saloon.timezone}")
+
+            staff = Staff.objects.get(id=staff_id)
+            print(f"DEBUG: Staff Name: {staff.name}, Is Holiday: {staff.is_holiday}")
+
+            if staff.is_holiday:
+                print(f"DEBUG: Staff {staff.name} is on holiday.")
+                return PrepareResponse(
+                    success=False,
+                    message=f"Staff {staff.name} is on holiday.",
+                    data=None,
+                ).send(400)
+
+            # Fetch slots
+            slots = fetch_available_slots(saloon, staff, date, service_variations)
+            if not slots:
+                print("DEBUG: No available slots found.")
+                return PrepareResponse(
+                    success=False,
+                    message="No available slots found.",
+                    data=None,
+                ).send(404)
+
+            print(f"DEBUG: Available Slots: {slots}")
+            return PrepareResponse(
+                success=True,
+                message="Available slots fetched successfully.",
+                data=slots,
+            ).send(200)
+
+        except Saloon.DoesNotExist:
+            print(f"DEBUG: Saloon with ID {saloon_id} not found.")
+            return PrepareResponse(
+                success=False,
+                message="Saloon not found.",
+                data=None,
             ).send(404)
 
-        serializer = self.get_serializer(queryset, many=True)
-        return PrepareResponse(
-            success=True,
-            message="Available slots fetched successfully.",
-            data=serializer.data
-        ).send(200)
+        except Staff.DoesNotExist:
+            print(f"DEBUG: Staff with ID {staff_id} not found.")
+            return PrepareResponse(
+                success=False,
+                message="Staff not found.",
+                data=None,
+            ).send(404)
+
+        except Exception as e:
+            print(f"DEBUG: An unexpected error occurred: {str(e)}")
+            return PrepareResponse(
+                success=False,
+                message="An unexpected error occurred.",
+                data={"error": str(e)},
+            ).send(500)
+
+
+
+        
+    
+
