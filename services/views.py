@@ -10,6 +10,10 @@ from .models import Service,ServiceVariation,ServiceImage
 from .serializers import  ServiceSerializer, ServiceImageSerializer, ServiceVariationSerializer, NestedServiceSerializer,AllServiceSerializer
 from core.utils.pagination import CustomPageNumberPagination
 from core.utils.response import PrepareResponse
+from django.core.cache import cache
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
+
 
 class ServiceListView(generics.GenericAPIView):
     serializer_class = ServiceSerializer
@@ -174,33 +178,6 @@ class ServiceVariationListView(generics.GenericAPIView):
             meta=paginated_data
         )
         return response.send(code=200)
-    
-# class NestedServiceListView(generics.GenericAPIView):
-#     serializer_class = NestedServiceSerializer
-#     # permission_classes = [IsAuthenticated]
-
-#     def get_queryset(self):
-#         country_code = self.request.country_code
-#         saloon_id = self.kwargs.get('saloon_id')
-#         if saloon_id:
-#             return Service.objects.filter(
-#                 saloon_id=saloon_id,
-#                 saloon__country__code=country_code
-#             ).select_related('saloon', 'saloon__country').prefetch_related(
-#                 Prefetch('variations', queryset=ServiceVariation.objects.all()),
-#                 Prefetch('images', queryset=ServiceImage.objects.all())
-#             )
-#         return Service.objects.none()
-
-#     def get(self, request, *args, **kwargs):
-#         queryset = self.get_queryset()
-#         serializer = self.get_serializer(queryset, many=True, context={'saloon': self.kwargs.get('saloon_id')})
-#         response = PrepareResponse(
-#             success=True,
-#             data=serializer.data,
-#             message="Services fetched successfully"
-#         )
-#         return response.send(code=200)
 class NestedServiceListView(generics.ListAPIView):
     serializer_class = NestedServiceSerializer
 
@@ -217,7 +194,9 @@ class NestedServiceListView(generics.ListAPIView):
             )
         return Service.objects.none()
 
-    def list(self, request, *args, **kwargs):
+    @method_decorator(cache_page(60 * 5))
+    def list(self, request, *args, **kwargs):   
+
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True, context={'saloon': self.kwargs.get('saloon_id')})
         response = PrepareResponse(
@@ -226,6 +205,7 @@ class NestedServiceListView(generics.ListAPIView):
             message="Services fetched successfully"
         )
         return response.send(code=200)
+
 
 class AllServiceListView(generics.GenericAPIView):
     serializer_class = AllServiceSerializer

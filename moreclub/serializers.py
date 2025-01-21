@@ -42,7 +42,7 @@ class SaloonSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'address', 'email', 'contact_no', 'country', 'currency', 'lat', 'lng',
             'short_description', 'long_description', 'website_link', 'facebook_link',
-            'instagram_link', 'logo', 'banner', 'amenities', 'country_code', 'currency_code'
+            'instagram_link', 'logo', 'banner', 'amenities', 'country_code', 'currency_code','timezone'
         ]
     
     def get_country_code(self, obj):
@@ -68,6 +68,7 @@ class SaloonSerializer(serializers.ModelSerializer):
         instance.lng = validated_data.get('lng', instance.lng)
         instance.banner=validated_data.get('banner',instance.banner)
         instance.logo=validated_data.get('logo',instance.logo)
+        instance.timezone=validated_data.get('timezone',instance.timezone)
         instance.short_description = validated_data.get('short_description', instance.short_description)
         instance.long_description = validated_data.get('long_description', instance.long_description)
         if validated_data.get('website_link', instance.website_link) is not None:

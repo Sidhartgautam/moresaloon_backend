@@ -38,7 +38,7 @@ class Saloon(models.Model):
     is_open= models.BooleanField(default=True)
     slug= models.SlugField( null=True, blank=True)
     timezone = models.CharField(
-        max_length=50,
+        max_length=100,
         choices=[(tz, tz) for tz in pytz.all_timezones],
         default='UTC',
         null=True,
