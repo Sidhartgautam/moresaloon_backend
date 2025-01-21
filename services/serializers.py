@@ -2,6 +2,8 @@ from rest_framework import serializers
 from .models import  Service, ServiceImage, ServiceVariation,ServiceVariationImage
 from saloons.models import Saloon
 from datetime import timedelta
+from django.core.cache import cache
+from django.utils.decorators import method_decorator
 
 
 class ServiceVariationSerializer(serializers.ModelSerializer):
@@ -136,6 +138,8 @@ class NestedServiceSerializer(serializers.ModelSerializer):
         saloon_id = self.context.get('saloon')
         variations = obj.variations.filter(service=obj, service__saloon_id=saloon_id)
         return NestedServiceVariationSerializer(variations, many=True).data
+
+
     
 class AllServiceSerializer(serializers.Serializer):
     name = serializers.CharField()
