@@ -33,7 +33,7 @@ class ServiceVariationSerializer(serializers.ModelSerializer):
     
     def get_discount_percentage(self, obj):
         if obj.discount_price:
-            return int(((obj.price - obj.discount_price) / obj.price) * 100)
+            return float(((obj.price - obj.discount_price) / obj.price) * 100)
         else:
             return None
         
@@ -83,7 +83,7 @@ class NestedServiceVariationSerializer(serializers.ModelSerializer):
     def get_discount_percentage(self, obj):
         if obj.discount_price:
             try:
-                return int(((obj.price - obj.discount_price) / obj.price) * 100)
+                return round(float(((obj.price - obj.discount_price) / obj.price) * 100),2)
             except ZeroDivisionError:
                 return None
         return None
