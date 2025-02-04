@@ -217,7 +217,8 @@ CORS_ALLOWED_ORIGINS = [
     "https://www.moredealsclub.com",
     "https://moresalons.com",
     "https://admin-panel-tau-drab.vercel.app",
-    "https://web-production-f5d1.up.railway.app"
+    "https://web-production-f5d1.up.railway.app",
+    "https://moresalon.vercel.app"
 
 
 
@@ -295,5 +296,14 @@ CACHES = {
         }
     }
 }
+
+
+# CACHES = {
+#     "default": {
+#         "BACKEND": "django_redis.cache.RedisCache",
+#         "LOCATION": "redis://127.0.0.1:6379/0",  
+        
+#     }
+# }
 
 
