@@ -102,7 +102,6 @@ class SaloonGallerySerializer(serializers.ModelSerializer):
     def get_images(self, obj):
         if obj.images and hasattr(obj.images, 'url'):
             request = self.context.get('request')
-            # Return absolute URL if request is provided
             return request.build_absolute_uri(obj.images.url) if request else obj.images.url
         return None
     def update(self, instance, validated_data):
