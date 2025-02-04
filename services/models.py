@@ -2,6 +2,7 @@ from django.db import models
 import uuid
 from saloons.models import Saloon
 from django.utils.text import slugify
+from core.utils.compression_image import compress_image
 from django.utils.translation import gettext_lazy as _
 
 
@@ -40,6 +41,10 @@ class Service(models.Model):
                 counter += 1
 
             self.slug = slug
+
+        if self.icon and hasattr(self.icon, 'file'):
+            self.icon = compress_image(self.icon.file)
+
 
         super().save(*args, **kwargs)
     class Meta:
@@ -95,6 +100,12 @@ class ServiceVariationImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     variation = models.ForeignKey(ServiceVariation, related_name='images', on_delete=models.CASCADE)
     image = models.ImageField(upload_to='services/service_variations')
+
+    def save(self, *args, **kwargs):
+        if self.image and hasattr(self.image, 'file'):
+            self.image = compress_image(self.image.file)
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Image for {self.variation.name}-{self.variation.service.saloon.name}"
