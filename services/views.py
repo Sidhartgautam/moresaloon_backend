@@ -207,25 +207,63 @@ class NestedServiceListView(generics.ListAPIView):
         return response.send(code=200)
 
 
+# class AllServiceListView(generics.GenericAPIView):
+#     serializer_class = AllServiceSerializer
+#     pagination_class = CustomPageNumberPagination
+
+#     def get_queryset(self):
+#         # Subquery to get a random icon for each service name
+#         random_icon = Service.objects.filter(
+#             name=OuterRef('name')  # Match service name
+#         ).order_by('?').values('icon')[:1]  # Pick one random icon
+#         queryset = (
+#             Service.objects.values('name')  # Fetch unique service names
+#             .annotate(
+#                 random_icon=Subquery(random_icon)  # Assign a random icon to each name
+#             )
+#             .distinct('name')  # Ensure distinct names
+#             .order_by('name')  # Order alphabetically
+#         )
+#         return queryset
+
+#     def get(self, request, *args, **kwargs):
+#         queryset = self.get_queryset()
+#         paginator = self.pagination_class()
+#         queryset = paginator.paginate_queryset(queryset, request)
+#         serializer = self.get_serializer(queryset, many=True)
+#         paginated_data = paginator.get_paginated_response(serializer.data)
+#         result = paginated_data['results']
+#         del paginated_data['results']
+
+#         response = PrepareResponse(
+#             success=True,
+#             data=result,
+#             message="All services fetched successfully",
+#             meta=paginated_data
+#         )
+#         return response.send(code=200)
+
 class AllServiceListView(generics.GenericAPIView):
     serializer_class = AllServiceSerializer
     pagination_class = CustomPageNumberPagination
 
     def get_queryset(self):
-        # Subquery to get a random icon for each service name
+        country_code = self.request.country_code  
         random_icon = Service.objects.filter(
-            name=OuterRef('name')  # Match service name
-        ).order_by('?').values('icon')[:1]  # Pick one random icon
+            name=OuterRef('name'),
+            saloon__country__code=country_code
+        ).order_by('?').values('icon')[:1]
 
-        # Main queryset with distinct service names and their random icon
         queryset = (
-            Service.objects.values('name')  # Fetch unique service names
+            Service.objects.filter(saloon__country__code=country_code) 
+            .values('name') 
             .annotate(
-                random_icon=Subquery(random_icon)  # Assign a random icon to each name
+                random_icon=Subquery(random_icon)  
             )
-            .distinct('name')  # Ensure distinct names
-            .order_by('name')  # Order alphabetically
+            .distinct('name')  
+            .order_by('name') 
         )
+
         return queryset
 
     def get(self, request, *args, **kwargs):

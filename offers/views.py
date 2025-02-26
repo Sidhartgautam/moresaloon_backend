@@ -1,4 +1,5 @@
 from rest_framework.generics import CreateAPIView, ListAPIView
+from django.utils import timezone
 from rest_framework.views import APIView
 from .models import SaloonOffers, SaloonCoupons, CouponUsage
 from .serializers import SaloonOfferSerializer, CouponSerializer,CouponListSerializer
@@ -67,8 +68,9 @@ class CouponListView(ListAPIView):
     serializer_class = CouponListSerializer
 
     def get_queryset(self):
-        saloon_id = self.kwargs.get('saloon_id')  # Extract saloon_id from the URL
-        country_code = self.request.headers.get('Country-Code')  # Extract country code from headers
+        saloon_id = self.kwargs.get('saloon_id') 
+        now=timezone.now() 
+        country_code = self.request.headers.get('Country-Code')  
 
         if not saloon_id:
             return PrepareResponse(
@@ -78,7 +80,7 @@ class CouponListView(ListAPIView):
                 code=400
             )
 
-        queryset = SaloonCoupons.objects.filter(saloon_id=saloon_id).prefetch_related('services')
+        queryset = SaloonCoupons.objects.filter(saloon_id=saloon_id ,start_date__lte=now,end_date__gte=now).prefetch_related('services')
 
         if country_code:
             queryset = queryset.filter(saloon__country__code=country_code)
