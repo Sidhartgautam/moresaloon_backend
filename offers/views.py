@@ -97,6 +97,30 @@ class CouponListView(ListAPIView):
         )
         return response.send(code=200)
     
+class AllCouponListView(ListAPIView):
+    serializer_class = CouponListSerializer
+
+    def get_queryset(self):
+        now=timezone.now() 
+        country_code = self.request.headers.get('Country-Code')  
+
+        queryset = SaloonCoupons.objects.filter(start_date__lte=now,end_date__gte=now).prefetch_related('services')
+
+        if country_code:
+            queryset = queryset.filter(saloon__country__code=country_code)
+
+        return queryset
+
+    def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        response = PrepareResponse(
+            success=True,
+            data=serializer.data,
+            message="Coupons fetched successfully"
+        )
+        return response.send(code=200)
+    
 class CheckCouponValidityAPIView(APIView):
     """
     API View to check the validity of a coupon for a specific saloon.
